@@ -1,0 +1,217 @@
+---
+title: Hello, Grace!
+---
+
+Let’s cover the basics of the Grace CLI and get **your first workflow up and running**. We’ll start with a simple CI-style pipeline that automates compiling, linking, and executing a “Hello, Grace” COBOL program on z/OS.
+
+# Getting Started
+
+## Prerequisites
+
+- [Zowe CLI](https://docs.zowe.org/stable/getting-started/cli-getting-started)
+
+  ```sh
+  npm install -g @zowe/cli@zowe-v3-lts
+  ```
+
+- After installing Zowe CLI, be sure to install the following plugins.
+
+  **These provide necessary functionality** for Grace and Hopper subprocesses to interact with z/OS services. The following plugins provide support for CICS, DB2, MQ, and z/OS FTP calls, and are **assumed to be installed by Grace**.
+
+  ```sh
+  zowe plugins install @zowe/cics-for-zowe-cli@zowe-v2-lts @zowe/db2-for-zowe-cli@zowe-v2-lts @zowe/mq-for-zowe-cli@zowe-v2-lts @zowe/zos-ftp-for-zowe-cli@zowe-v2-lts
+  ```
+
+---
+
+# Scaffold a new workflow
+
+The recommended way to create a new Grace workflow is with [grace init](../reference/cli-reference/init). This scaffolds the necessary subdirectories and starter files.
+
+```sh
+workflow/
+├── .grace/
+│   ├── deck/
+│   └── logs/
+├── src/
+└── grace.yml
+```
+
+Upon invoking `grace init`, you will be prompted to fill out optional fields for workflow configuration:
+
+1. **Workspace name**: Leave this blank to use the current directory or populate it to create a new directory
+2. **HLQ**: The high-level qualifier to use for creating datasets
+3. **Profile**: The Zowe profile to use for this workflow
+
+To get hands-on quickly, we'll use a built-in tutorial template that provides a populated `grace.yml` and "Hello, Grace" COBOL program ready for us to use:
+
+```sh
+grace init my-workflow --tutorial
+```
+
+> Invoking `grace init` with an argument pre-populates the workspace name field for scaffolding a new directory.
+
+---
+
+# Configure your environment
+
+## Zowe config
+
+Grace uses [Zowe](https://www.zowe.org/) for authentication. If you work with z/OS systems, you might already have this configured. If not, see [the official docs](https://docs.zowe.org/stable/web_help/docs/zowe_config_init.html).
+
+You can test connection to your mainframe's z/OSMF service with:
+
+```sh
+zowe zosmf check status
+```
+
+## Grace config
+
+Open your newly created workflow directory and inspect `grace.yml`.
+
+This is where you
+
+1. **Bind to a Zowe profile** (e.g. `zosmf, tso, global_base`)
+2. **Set dataset prefixes** and name-patterns for your decks & outputs
+3. **Configure your compiler/linker** options (COBOL copybooks, your site's `LOADLIB`, etc.)
+4. **Architect an end-to-end workflow** chaining mainframe and cloud based jobs, controlling data lifetimes, and defining hooks for your integrations of choice
+
+For now, simply ensure your compiler, linker, and dataset configurations match the expectations of **your target z/OS environment**. A typical `grace.yml` config section might look like this:
+
+```yaml
+config:
+  profile: zosmf # your configured Zowe profile name
+  defaults:
+    compiler:
+      pgm: IGYCRCTL # site-specific COBOL compiler
+      parms: "OBJECT,NODECK,LIB"
+      steplib: IGY.V6R4M0.SIGYCOMP # site-specific steplib
+    linker:
+      pgm: IEWL
+      parms: "LIST,MAP,XREF"
+
+datasets:
+  jcl: IBMUSER.GRC.HELLO.JCL # target PDS for JCL
+  src: IBMUSER.GRC.HELLO.SRC # target PDS for COBOL source files
+  loadlib: IBMUSER.LOAD # site-specific loadlib
+```
+
+See the [YAML spec](/docs/category/yaml-spec) for more information on `grace.yml` fields.
+
+Hint: You can run `grace lint` to validate your `grace.yml` syntax.
+
+> Dataset identifiers must comply with z/OS dataset naming conventions. This means adhering to acceptable character counts, level limits, and special character restrictions. Refer to the [IBM documentation](https://www.ibm.com/docs/en/engineering-lifecycle-management-suite/workflow-management/7.1.0?topic=definitions-zos-data-set-naming-rules).
+
+---
+
+# Workflow overview
+
+Once your environment is configured, Grace will look at the `jobs` section of your `grace.yml` to determine what to do. Each job defines a step in your pipeline, such as compiling source code, running scripts, moving files on and off the mainframe, or calling external APIs.
+
+The tutorial workflow contains three jobs:
+
+```yaml
+jobs:
+  - name: CMPHELLO
+    type: compile
+    inputs:
+      - name: SYSIN
+        path: src://hello.cbl
+    outputs:
+      - name: SYSLIN
+        path: temp://hello.obj
+
+  - name: LNKHELLO
+    type: linkedit
+    depends_on: [CMPHELLO]
+    program: HELLO
+    inputs:
+      - name: SYSLIN
+        path: temp://hello.obj
+
+  - name: RUNHELLO
+    type: execute
+    depends_on: [LNKHELLO]
+    program: HELLO
+```
+
+> Job names **must** be uppercase, a maximum of **8 characters long**, and adhere to **z/OS PDS member naming conventions**. See [z/OS data set naming rules](https://www.ibm.com/docs/en/engineering-lifecycle-management-suite/workflow-management/7.1.0?topic=definitions-zos-data-set-naming-rules).
+
+- **CMPHELLO**
+  - Invokes the COBOL compiler with the local file `./src/hello.cbl` as input.
+  - Produces an object file (`hello.obj`).
+- **LNKHELLO**
+  - Takes the object file and links it into an executable load module named `HELLOGRC`.
+  - This step depends on the compile job.
+- **RUNHELLO**
+  - Executes the `HELLOGRC` program on z/OS.
+  - This is the final step, and it depends on the link job completing successfully.
+
+To dive deeper, see [YAML Spec - Jobs](/docs/reference/yaml-spec/jobs) for job types, configuring dependencies and concurrency, and advanced chaining techniques.
+
+> Prefix `temp://` is a platform agnostic virtual mount path. It denotes intermediate datasets between jobs that are handled behind the scenes by Grace. The engine will provision datasets, wire dependencies, and handle cleanup automatically.
+>
+> In a production workflow, you might have virtual `temp://` paths holding data between mainframe operations, cloud endpoints, local scripts, and so on.
+>
+> To learn more about how this works, see LINK TODO HERE.
+
+---
+
+# Generate your job deck
+
+Once your environment is configured, you're ready to **dynamically compile JCL and sync your workflow** to the mainframe.
+
+```sh
+grace deck
+```
+
+This will:
+
+- **Parse** your `grace.yml`
+- **Generate JCL** for each job in `.grace/deck/`
+- **Ensure target datasets exist** and provision them automatically if not
+- **Upload COBOL source files and JCL** to the appropriate z/OS datasets
+
+> Command `grace deck` is **idempotent**. You can run it repeatedly to sync local workflow files to the mainframe without triggering job execution.
+
+You can inspect the `.grace/deck/` directory to view the JCL that will be submitted for each job. You can then fine tune them and run `grace deck --no-compile` to sync your local files **without overwriting them**.
+
+Grace pulls from a repository of pre-built JCL templates for each step type - letting you focus on your architecture, not JCL syntax errors.
+
+---
+
+# Run your workflow
+
+Now that your source and JCL are uploaded, you're ready to run your new end-to-end workflow!
+
+```sh
+grace run
+```
+
+This will:
+
+- **Submit your jobs** to the mainframe in order
+- **Write structured JSON logs** into `.grace/logs/`
+- **Monitor return codes** and stream **logs and lifecycle status** in the terminal
+
+> If you are curious about what orchestration looks like in a hosted or asynchronous environment, see [grace submit](/docs/reference/cli-reference/submit).
+
+> Command `grace run` does not upload or regenerate anything. It purely handles workflow orchestration and monitoring with the last datasets you decked.
+
+---
+
+# Big Iron just learned a new trick
+
+We just orchestrated a **multi-step z/OS COBOL workflow**, from compiling and linking to execution and log collection, **using a single declarative YAML file**.
+
+You didn't have to:
+
+- **Manually write and maintain** brittle JCL for each step
+- **Allocate and clean up** temporary datasets
+- Submit jobs **one at a time and poll SDSF** for return codes
+- **Copy logs and outputs** back from the mainframe
+- Explain to your team why you spent 2 hours debugging DD statements
+
+Grace abstracts all of this into an **automated, version-controllable workflow**, easily shared across teams and reusable across environments and business cases. Need to update your source file? Just run `grace deck`. Want to test a different input dataset? Just edit `grace.yml`. Integrate workflow triggers in your event driven architecture? (We're working on it) 😉.
+
+**Welcome to modern DevOps on the mainframe.** You're on your way to building **automation, pipelines, and tooling on your own terms** with the same principles you'd use to deploy a container or cloud function.

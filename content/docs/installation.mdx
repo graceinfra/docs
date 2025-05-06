@@ -1,0 +1,98 @@
+---
+title: Installation
+description: Grace can be installed via install script, prebuilt binaries, or built directly from source.
+---
+
+## Install via `curl`
+
+You can install Grace in one line using our install script:
+
+```sh
+curl -fsSL https://graceinfra.org/install.sh | sh
+```
+
+This script will:
+
+- Detect your OS and architecture
+- Download the latest compatible binary from GitHub
+- Install it to `/usr/local/bin/grace`
+
+Once it’s done, verify with:
+
+```sh
+grace --version
+```
+
+---
+
+## Install from GitHub Releases
+
+Grace provides prebuilt binaries for macOS, Linux, and Windows via [GitHub Releases](https://github.com/graceinfra/grace/releases).
+
+1. Visit the [Releases page](https://github.com/graceinfra/grace/releases)
+2. Download the binary for your platform:
+    - `grace-macos-amd64` or `grace-macos-arm64`
+    - `grace-linux-amd64`
+    - `grace-windows.exe`
+3. Rename and move the binary to your `$PATH`. For example on macOS or Linux:
+
+    ```sh
+    mv grace-macos-arm64 grace  
+    chmod +x grace  
+    sudo mv grace /usr/local/bin/
+    ```
+
+4. Test it:
+
+   ```sh
+   grace --version
+   ```
+
+---
+
+## Build from Source
+
+If you want the latest development version, you can build from source.
+
+**Prerequisite**: Go 1.21+ must be installed.
+
+1. Clone the repo:  
+
+   ```sh
+   git clone https://github.com/graceinfra/grace.git
+   ```
+
+2. Build the CLI:  
+
+   ```sh
+   cd grace  
+   go build -o grace ./cmd/grace
+   ```
+
+3. Install it:  
+
+   ```sh
+   sudo mv grace /usr/local/bin/
+   ```
+
+4. Confirm installation:  
+
+   ```sh
+   grace --version
+   ```
+
+---
+
+## Verifying Your Install
+
+Run:  
+
+```sh
+grace init --help
+```
+
+You should see the usage instructions for initializing a Grace workspace.
+
+---
+
+Need help? [Open an issue](https://github.com/graceinfra/grace/issues) or join the [Discussions](https://github.com/graceinfra/grace/discussions).

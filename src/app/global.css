@@ -1,3 +1,36 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
+
+/* Reset blockquote styling */
+.prose blockquote {
+  font-style: normal !important;
+  font-weight: 400 !important;
+  border-left-color: theme('colors.zinc.200');
+  background-color: theme('colors.zinc.50');
+  border-radius: theme('borderRadius.lg');
+  padding: theme('spacing.4') theme('spacing.6') !important;
+  margin: theme('spacing.6') 0 !important;
+  quotes: none;
+}
+
+.prose blockquote p {
+  font-style: normal !important;
+  font-weight: 400 !important;
+  margin: 0 !important;
+}
+
+.prose blockquote p:first-of-type::before,
+.prose blockquote p:last-of-type::after {
+  content: none !important;
+}
+
+.dark .prose blockquote {
+  border-left-color: theme('colors.zinc.800');
+  background-color: theme('colors.zinc.900');
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}

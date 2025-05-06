@@ -1,0 +1,3 @@
+{
+  "pages": ["index", "installation", "tutorials/", "cli-reference/", "directory-layout/", "yaml-spec/"]
+}
