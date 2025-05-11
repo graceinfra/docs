@@ -47,7 +47,7 @@ export default function HomePage() {
   <span className="text-zinc-500 dark:text-zinc-400">$</span> grace run{"\n"}
   <span className="text-green-500">✓</span> Fetched CSV → HLQ.INPUT.DATA{"\n"}
   <span className="text-green-500">✓</span> COBOL job success: transform.jcl{"\n"}
-  <span className="text-green-500">✓</span> Exported output.csv → s3:vsam-migration-staging/{"\n"}
+  <span className="text-green-500">✓</span> Exported output.csv → s3://vsam-migration-staging/{"\n"}
   {"\n"}
   <span className="text-zinc-500 dark:text-zinc-400">$</span> grace logs JOB12345{"\n"}
   <span className="text-green-500">✓</span> RC=0000 | z/OS → cloud ☑️

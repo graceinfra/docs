@@ -3,7 +3,7 @@ title: VSAM to Postgres
 description: Learn how to extract VSAM data from a mainframe and push it into a relational database using Grace.
 ---
 
-This tutorial walks you through a complete **VSAM-to-RDS pipeline** using Grace. You'll orchestrate:
+This tutorial walks you through a complete **VSAM -> RDS ETL pipeline** using Grace. You'll orchestrate:
 
 1. Extracting VSAM data from z/OS using a COBOL job
 2. Transforming it into CSV format
@@ -18,27 +18,11 @@ All from a **single declarative `grace.yml`** file. No JCL editing, no glue scri
 
 Before you begin, make sure you have the following:
 
-- ✅ A **Grace workspace** initialized with `grace init`
-- ✅ A configured **Zowe CLI profile** with access to a z/OS system
-- ✅ A working **COBOL transformation job** that reads VSAM and outputs fixed-format or delimited data
-- ✅ AWS S3 bucket + IAM credentials (if using S3 as staging)
-- ✅ An RDS instance with access credentials
-- ✅ [Grace CLI installed](/docs/installation)
+- A **Grace workspace** initialized with `grace init`
+- A configured **Zowe CLI profile** with access to a z/OS system
+- A working **COBOL transformation job** that reads VSAM and outputs fixed-format or delimited data
+- AWS S3 bucket + IAM credentials (if using S3 as staging)
+- An RDS instance with access credentials
+- [Grace CLI installed](/docs/installation)
 
 ---
-
-## What You’ll Build
-
-```txt
-[VSAM Dataset]
-     ↓
-[COBOL job via JCL]
-     ↓
-[CSV Output in z/OS dataset]
-     ↓
-[Grace uploads to S3]
-     ↓
-[Grace Python boto3 script]
-     ↓
-[Insert rows into RDS]
-```

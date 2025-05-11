@@ -1,18 +1,23 @@
 ---
 title: Hello, Grace!
+description: Cover the basics of the Grace CLI and get up and running with your first workflow.
 ---
 
-Let’s cover the basics of the Grace CLI and get **your first workflow up and running**. We’ll start with a simple CI-style pipeline that automates compiling, linking, and executing a “Hello, Grace” COBOL program on z/OS.
+We’ll start with a simple CI-style pipeline that automates compiling, linking, and executing a “Hello, Grace” COBOL program on z/OS.
 
-# Getting Started
+# Prerequisites
 
-## Prerequisites
+- [Grace CLI](https://github.com/graceinfra/grace)
+
+  See [Installation](/docs/installation) for instructions on getting Grace running on your machine.
 
 - [Zowe CLI](https://docs.zowe.org/stable/getting-started/cli-getting-started)
 
   ```sh
   npm install -g @zowe/cli@zowe-v3-lts
   ```
+
+  We recommend you install Zowe CLI v3 to ensure maximum compatibility.
 
 - After installing Zowe CLI, be sure to install the following plugins.
 
@@ -26,7 +31,7 @@ Let’s cover the basics of the Grace CLI and get **your first workflow up and r
 
 # Scaffold a new workflow
 
-The recommended way to create a new Grace workflow is with [grace init](../reference/cli-reference/init). This scaffolds the necessary subdirectories and starter files.
+The recommended way to create a new Grace workflow is with [grace init](/docs/cli-reference/init). This scaffolds all necessary subdirectories and starter files so you can focus on getting logic in motion.
 
 ```sh
 workflow/
@@ -39,7 +44,7 @@ workflow/
 
 Upon invoking `grace init`, you will be prompted to fill out optional fields for workflow configuration:
 
-1. **Workspace name**: Leave this blank to use the current directory or populate it to create a new directory
+1. **Workflow name**: Leave this blank to use the current directory or populate it to create a new directory
 2. **HLQ**: The high-level qualifier to use for creating datasets
 3. **Profile**: The Zowe profile to use for this workflow
 
@@ -80,20 +85,20 @@ For now, simply ensure your compiler, linker, and dataset configurations match t
 
 ```yaml
 config:
-  profile: zosmf # your configured Zowe profile name
+  profile: zosmf                    # your configured Zowe profile name
   defaults:
     compiler:
-      pgm: IGYCRCTL # site-specific COBOL compiler
+      pgm: IGYCRCTL                 # site-specific COBOL compiler
       parms: "OBJECT,NODECK,LIB"
-      steplib: IGY.V6R4M0.SIGYCOMP # site-specific steplib
+      steplib: IGY.V6R4M0.SIGYCOMP  # site-specific steplib
     linker:
       pgm: IEWL
       parms: "LIST,MAP,XREF"
 
 datasets:
-  jcl: IBMUSER.GRC.HELLO.JCL # target PDS for JCL
-  src: IBMUSER.GRC.HELLO.SRC # target PDS for COBOL source files
-  loadlib: IBMUSER.LOAD # site-specific loadlib
+  jcl: IBMUSER.GRC.HELLO.JCL 	    # target PDS for JCL
+  src: IBMUSER.GRC.HELLO.SRC 	    # target PDS for COBOL source files
+  loadlib: IBMUSER.LOAD             # site-specific loadlib
 ```
 
 See the [YAML spec](/docs/category/yaml-spec) for more information on `grace.yml` fields.
@@ -147,7 +152,7 @@ jobs:
   - Executes the `HELLOGRC` program on z/OS.
   - This is the final step, and it depends on the link job completing successfully.
 
-To dive deeper, see [YAML Spec - Jobs](/docs/reference/yaml-spec/jobs) for job types, configuring dependencies and concurrency, and advanced chaining techniques.
+To dive deeper, see [YAML Spec - Jobs](/docs/yaml-spec/jobs) for job types, configuring dependencies and concurrency, and advanced chaining techniques.
 
 > Prefix `temp://` is a platform agnostic virtual mount path. It denotes intermediate datasets between jobs that are handled behind the scenes by Grace. The engine will provision datasets, wire dependencies, and handle cleanup automatically.
 >
@@ -194,7 +199,7 @@ This will:
 - **Write structured JSON logs** into `.grace/logs/`
 - **Monitor return codes** and stream **logs and lifecycle status** in the terminal
 
-> If you are curious about what orchestration looks like in a hosted or asynchronous environment, see [grace submit](/docs/reference/cli-reference/submit).
+> If you are curious about what orchestration looks like in a hosted or asynchronous environment, see [grace submit](/docs/cli-reference/submit).
 
 > Command `grace run` does not upload or regenerate anything. It purely handles workflow orchestration and monitoring with the last datasets you decked.
 
@@ -214,4 +219,4 @@ You didn't have to:
 
 Grace abstracts all of this into an **automated, version-controllable workflow**, easily shared across teams and reusable across environments and business cases. Need to update your source file? Just run `grace deck`. Want to test a different input dataset? Just edit `grace.yml`. Integrate workflow triggers in your event driven architecture? (We're working on it) 😉.
 
-**Welcome to modern DevOps on the mainframe.** You're on your way to building **automation, pipelines, and tooling on your own terms** with the same principles you'd use to deploy a container or cloud function.
+**Welcome to modern DevOps on the mainframe.** You're on your way to building cross-platform **automation, pipelines, and tooling** with the same principles you'd use to deploy a container or cloud function.
