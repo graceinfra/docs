@@ -5,7 +5,7 @@ description: Define the individual steps of your workflow within the 'jobs' bloc
 
 The `jobs` block in your `grace.yml` file is where the core logic of your workflow is defined. It's an array of `job` objects, where each object represents a distinct step in your automation pipeline.
 
-Grace executes these jobs based on their defined order, dependencies, and types, orchestrating operations across z/OS and other platforms (like the orchestrating machine for `shell` jobs).
+Grace executes these jobs based on their defined order, dependencies, and types, orchestrating operations across z/OS and other platforms (like the host machine for `shell` jobs).
 
 ```yaml
 jobs:
