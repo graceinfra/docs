@@ -129,7 +129,7 @@ When you execute `grace submit`, it:
 Since `grace submit` returns immediately, you need other ways to monitor the workflow:
 
 - **Check Log Files:** The primary method currently is to inspect the files in the log directory, especially `workflow.log` for overall progress and individual job logs for details.
-- **`grace status <workflow-id>` (Future):** A command to query the status of a submitted workflow is a planned feature.
-- **`grace dash` (Future):** A terminal-based dashboard for viewing active and completed workflows is also envisioned.
+- **`grace logs <workflow-id>` (Future):** A command to tail the logs of a submitted workflow.
+- **`grace status <workflow-id>` (Future):** A command to query the status of a submitted workflow.
 
 Use `grace submit` for workflows that you don't need to watch execute in real-time or for integrating Grace into automated scripts and CI/CD systems.

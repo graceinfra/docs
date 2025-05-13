@@ -1,0 +1,214 @@
+---
+title: Jobs
+description: Define the individual steps of your workflow within the 'jobs' block of grace.yml.
+---
+
+The `jobs` block in your `grace.yml` file is where the core logic of your workflow is defined. It's an array of `job` objects, where each object represents a distinct step in your automation pipeline.
+
+Grace executes these jobs based on their defined order, dependencies, and types, orchestrating operations across z/OS and other platforms (like the orchestrating machine for `shell` jobs).
+
+```yaml
+jobs:
+  - name: RUNPROG
+    type: execute
+    program: MYPROG
+    inputs:
+      - name: PARMIN
+        path: zos://PROD.PARMLIB(RUNX)
+    outputs:
+      - name: REPORT
+        path: zos-temp://runprog.report.txt
+
+  - name: PROCESSREP
+    type: shell
+    depends_on: [RUNPROG]
+    with:
+      script: scripts/cpyreport.sh
+    inputs:
+      - name: REPORTFILE
+        path: zos-temp://runprog.report.txt
+    outputs:
+      - name: LOCALRPT
+        path: file://./reports/final_run_report.txt
+```
+
+---
+
+# Job definition structure
+
+Each entry in the `jobs` array is a YAML object that defines a single job. All jobs share a set of common fields, while some fields are specific to certain job types. For more information on job-specific fields, refer to their individual pages under [YAML Specification - Jobs](/docs/yaml-spec/jobs).
+
+---
+
+# Required fields
+
+## `name`
+
+```yaml
+jobs:
+  - name: BUILD01
+```
+
+- **Type:** `String`
+- **Required:** Yes
+- **Description:** A unique name for this job within the workflow. This name is crucial for several reasons:
+  - **Dependency tracking:** Other jobs will refer to this name in their `depends_on` list.
+  - **JCL member naming:** For z/OS job types (`compile`, `linkedit`, `execute`), if Grace generates or uploads JCL, the `name` is used as the PDS member name in the `datasets.jcl` PDS.
+  - **Logging and reporting:** Used to identify the job in logs, summaries, and terminal output.
+- **Constraints:**
+  - Must be unique across all jobs in `grace.yml`
+  - Must adhere to [z/OS PDS member naming conventions](https://www.ibm.com/docs/en/engineering-lifecycle-management-suite/workflow-management/7.1.0?topic=definitions-zos-data-set-naming-rules)
+
+---
+
+## `type`
+
+```yaml
+jobs:
+  - name: COBSTEP
+    type: compile
+    # ...
+  - name: RUNLOCAL
+    type: shell
+    # ...
+```
+
+- **Type:** `String`
+- **Required:** Yes
+- **Description:** Specifies the orchestration module this job will use for its execution.
+- **Built-in modules:**
+  - `compile`: Compiles source code (e.g. COBOL, PL/I) on z/OS.
+  - `linkedit`: Link-edits object code into an executable load module on z/OS.
+  - `execute`: Executes a program or batch job on z/OS.
+  - `shell`: Executes a command or script on the machine from which Grace is orchestrating.
+
+Detailed configurations and specific fields for each job.type are covered in their respective pages under the YAML Specification. (e.g., [Execute Jobs](/docs/yaml-spec/jobs/execute), [Shell Jobs](/docs/yaml-spec/jobs/shell)).
+
+---
+
+# Optional fields
+
+These fields are used to control execution flow and data management.
+
+## `depends_on`
+
+```yaml
+jobs:
+  - name: JOB_A
+    type: compile
+    # ...
+
+  - name: JOB_B
+    type: linkedit
+    depends_on: [JOB_A]
+    # ...
+
+  - name: JOB_C
+    type: execute
+    depends_on: [JOB_A, JOB_B]
+    # ...
+```
+
+- **Type:** `[]String`
+- **Required:** No
+- **Description:** Specifies a list of other job `name` values that must complete successfully before this current job can begin execution. This is how you define the sequence and dependencies in your workflow.
+  - If a job in the `depends_on` list fails or is skipped, this current job (and any jobs that depend on it) will also be skipped.
+  - Grace automatically builds a Directed Acyclic Graph (DAG) from these dependencies and will detect circular dependencies during validation (`grace lint`).
+
+> In the above example, `JOB_B` will only run after `JOB_A` completes successfully. `JOB_C` will only run after both `JOB_A` and `JOB_B` complete successfully.
+
+---
+
+## `inputs`
+
+```yaml
+jobs:
+  - name: PROCESSDATA
+    type: execute
+    depends_on: [STEP1]
+    inputs:
+      - name: SYSIN
+        path: src://control.cards
+
+      - name: CUSTFILE
+        path: zos://PROD.CUSTOMER.DATA
+
+      - name: PREVIOUT
+        path: zos-temp://step1.output.file # Output from a previous job
+        disp: OLD
+```
+
+- **Type:** `[]Object`
+- **Required:** No
+- **Description:** Defines the data inputs required by this job. Each item in the array specifies a named input (often corresponding to a DDName for z/OS jobs) and a virtual mount point indicating the source of the data.
+- **Sub-fields:**
+  - `name` _(String, Required)_ : The logical name for this input (e.g. `SYSIN`, `COPYBOOK`, `CONFIGFILE`). For z/OS jobs, this becomes the DDName in the JCL.
+  - `path` _(String, Required)_ : A [virtual path](#) specifying the location of the input data (e.g. `src://myprog.cbl`, `zos-temp://object.obj`, `zos://PROD.DATA(MEMBER)`, `file://./local_data.txt`).
+  - `disp` _(String, Optional, z/OS only)_ : Specifies the JCL `DISP=` subparameter for this DD statement (e.g. `SHR`, `OLD`). Defaults to `SHR` for inputs if not specified.
+- **Primary uses:**
+  - **Data provisioning for z/OS jobs:** Grace uses this to generate appropriate DD statements in JCL. For `src://` paths, it triggers uploads. For `zos-temp://` paths, it wires up outputs from previous jobs.
+  - **Data provisioning for `shell` jobs:** `zos://` or `zos-temp://` inputs are downloaded to a local staging area and made available to local scripts via environment variables that Grace exposes based on the input dataset name. (e.g. `GRACE_INPUT_DDNAME`).
+
+For a full explanation of virtual path prefixes and how data flows between jobs and platforms, see [Virtual Paths and Data Flow](#).
+
+---
+
+## `outputs`
+
+```yaml
+jobs:
+  - name: GENREPORT
+    type: execute
+    outputs:
+      - name: SYSPRINT
+        path: zos-temp://report.listing
+        dcb: "RECFM=FBA,LRECL=133"
+
+      - name: ARCHIVED
+        path: zos://MONTHLY.REPORTS(OCT23)
+        disp: "(NEW,CATLG,KEEP)"
+
+      - name: DEBUGDATA
+        path: local-temp://debug_out.txt
+        keep: true
+```
+
+- **Type:** `[]Object`
+- **Required:** No
+- **Description:** Defines the data outputs produced by this job. Each item in the array specifies a named output (often corresponding to a DDName for z/OS jobs) and a virtual mount point indicating where the output data should be accessed by consequent jobs or be placed indefinitely.
+- **Sub-fields:**
+  - `name` _(String, Required)_ : The logical name for this input (e.g. `SYSLIN`, `REPORT`, `ARCHIVE`). For z/OS jobs, this becomes the DDName in the JCL.
+  - `path` _(String, Required)_ : A [virtual path](#) specifying the intended location or identifier for the output data.
+    - `zos-temp://` - Grace manages the allocation and cleanup of this temporary z/OS dataset. The actual DSN is generated by Grace.
+    - `local-temp://` - Grace manages a temporary local file in a staging area.
+    - `zos://` - Indicates that the job writes to a specific, persistent z/OS dataset.
+    - `file://` - Indicates the job writes to a specific local path.
+  - `disp` _(String, Optional, z/OS only)_ : Specifies the JCL `DISP=` subparameter for this DD statement (e.g. `(NEW,CATLG,DELETE)`). Defaults are applied by Grace based on context if not specified.
+  - `space` _(String, Optional, z/OS only)_ : Specifies the JCL `SPACE=` parameter for dataset allocation.
+  - `dcb` _(String, Optional, z/OS only)_ : Specifies JCL `DCB=` parameters (e.g. `RECFM=FB,LRECL=80`)
+  - `keep` _(Boolean, Optional)_ : Grace will not delete this temporary resource during cleanup, even if cleanup is enabled [globally](/docs/yaml-spec/config#cleanup).
+- **Primary uses:**
+  - **Data definition for z/OS jobs:** Grace uses this to generate appropriate DD statements in JCL for output datasets, including allocation parameters for `zos-temp://` paths.
+  - **Data staging for `shell` jobs:** Grace handles cross-platform file transfers for `zos://` or `zos-temp://` paths from a local staging file to the specific mainframe dataset.
+  - **Exposing resources downstream:** Declaring outputs makes them available for consumption by subsequent jobs via their virtual paths.
+
+For a full explanation of virtual path prefixes and how data flows between jobs and platforms, see [Virtual Paths and Data Flow](#).
+
+---
+
+This covers the most common fields you'll encounter across all job types. The subsequent pages in the YAML Specification will dive into job-specific fields (like `jcl` and `program`), and then into the unique parameters for each distinct job type.
+
+<Cards>
+  <Card href="/docs/yaml-spec/jobs/compile" title="Compile">
+    The `compile` job module.
+  </Card>
+  <Card href="/docs/yaml-spec/jobs/linkedit" title="Linkedit">
+    The `linkedit` job module.
+  </Card>
+  <Card href="/docs/yaml-spec/jobs/execute" title="Execute">
+    The `execute` job module.
+  </Card>
+  <Card href="/docs/yaml-spec/jobs/shell" title="Shell">
+    The `shell` job module.
+  </Card>
+</Cards>

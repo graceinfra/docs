@@ -54,7 +54,7 @@ grace lint
   - Ensures that all jobs listed in a `depends_on` array exist.
   - Checks that a job does not depend on itself.
 - **Dependency cycles**: Detects circular dependencies between jobs (e.g., Job A depends on Job B, and Job B depends on Job A).
-- **virtual path production**:
+- **Virtual path production**:
   - Ensures that `zos-temp://` and `local-temp://` input paths are produced by an output of some job in the workflow.
   - Warns or errors if multiple jobs attempt to produce the exact same `zos-temp://` or `local-temp://` virtual path.
 

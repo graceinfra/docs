@@ -1,5 +1,107 @@
 ---
 title: Config
+description: Specification for the 'config' section of grace.yml.
 ---
 
-placeholder
+The `config` block in your `grace.yml` file is used to define global settings that apply to the entire workflow execution. These settings control how Grace interacts with your z/OS environment, manages concurrent operations, and handles default behaviors for certain job types.
+
+```yaml
+config:
+  profile: "zosmf_profile_name"
+  concurrency: 5
+  defaults:
+    compiler:
+      pgm: "IGYCRCTL"
+      parms: "OBJECT,NODECK,LIB"
+      steplib: "CBC.SIGYCOMP"
+    linker:
+      pgm: "IEWL"
+      parms: "LIST,MAP,XREF"
+      steplib: "CEE.SCEELKED"
+  cleanup:
+    on_success: true
+    on_failure: false
+```
+
+---
+
+# Required fields
+
+## `profile`
+
+```yaml
+config:
+  profile: my_dev_lpar_profile
+```
+
+- **Type:** `string`
+- **Description:** Specifies the name of the Zowe profile that Grace will use for all z/OS interactions. This profile **must** be pre-configured in your Zowe environment. Grace relies on this profile for authentication and connection details to your z/OSMF instance.
+
+> Learn how to set up Zowe CLI profiles in the [Configuration](/docs/configuration) guide.
+
+---
+
+# Optional fields
+
+## `concurrency`
+
+```yaml
+config:
+  concurrency: 5
+```
+
+- **Type:** `integer`
+- **Default:** 5
+- **Description:** The maximum number of Grace job steps that will run concurrently. This acts as a global semaphore for the workflow's active job executions, helping to manage local and remote resource utilization. For example, if set to `3`, no more than three jobs will be in their `Execute` handler stage at any given moment.
+
+---
+
+## `defaults`
+
+```yaml
+config:
+  defaults:
+    compiler:
+    pgm: IGYCRCTL
+    parms: "OBJECT,NODECK,LIB"
+    steplib: "IGY.V6R4M0.SIGYCOMP" # Example COBOL V6.4 compiler library
+  linker:
+    pgm: IEWL
+    parms: "LIST,MAP,XREF"
+    # steplib: "CEE.SCEELKED" # Usually not needed if linker is in LNKLST
+```
+
+- **Type:** `Object`
+- **Description:** This block allows you to define default parameters for common toolchains like compilers and linkers. These defaults will be used by jobs of the corresponding types unless explicitly overridden within the job's own definition (using the [overrides](/docs/yaml-spec/jobs/#overrides) block in a job).
+- **Sub-fields:**
+  - `compiler` _(Object)_ : Default settings for jobs with `type: compile`
+    - `pgm` _(String)_ : The default program name for the compiler (e.g. `IGYCRCTL` for IBM Enterprise COBOL).
+    - `parms` _(String, Optional)_ : Default compiler parameters.
+    - `steplib` _(String, Optional)_ : The default `STEPLIB` dataset (or a colon-separated list of datasets) for the compiler step. If your compiler is in the system's `LNKLST`, this might not be needed.
+  - `linker` _(Object)_ : Default settings for jobs with `type: linkedit`
+    - `pgm` _(String)_ : The default program name for the linkage editor (e.g. `IEWL` or `HEWLKED`).
+    - `parms` _(String, Optional)_ : Default linkage editor parameters.
+    - `steplib` _(String, Optional)_ : The default `STEPLIB` dataset for the linkage editor step. Usually, the linkage editor is in LNKLST.
+
+---
+
+## `cleanup`
+
+```yaml
+config:
+  cleanup:
+    on_success: true
+    on_failure: false
+```
+
+- **Type:** `Object`
+- **Description:** Controls the automatic deletion of temporary datasets created by Grace. Temporary datasets are those specified with `zos-temp://` or `local-temp://` virtual path prefixes in job `outputs` **not** marked with `keep: true`.
+- **Sub-fields**:
+  - `on_success` _(Boolean)_ :
+    - **Default:** `true`
+    - If `true`, temporary datasets are automatically deleted if the entire workflow completes successfully.
+    - If `false`, temporary datasets are retained even if the workflow is successful.
+  - `on_failure` _(Boolean)_ :
+    - **Default:** `false`
+    - If `true`, temporary datasets are automatically deleted even if the workflow fails at some point.
+    - If `false`, temporary datasets are retained if the workflow fails, which can be useful for debugging the data left by the last successful steps.

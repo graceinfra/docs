@@ -134,18 +134,16 @@ An example snippet from `summary.json`:
 
 When a workflow is initiated using `grace submit` or `grace run`, Grace writes its main orchestration log to a `workflow.log` file within the run-specific log directory. The contents are identical to a `grace run --verbose` invocation, and hold logs of all levels for detailed traceability.
 
-- **Content:** This file contains detailed, timestamped log entries (at DEBUG level by default) covering the entire lifecycle of the background orchestration:
+This file contains detailed, timestamped log entries (at DEBUG level by default) covering the entire lifecycle of the background orchestration:
 
-  - Initialization messages.
-  - Configuration loading and validation.
-  - Graph building.
-  - Executor state changes (jobs moving from PENDING to READY to DISPATCHING, etc.).
-  - Job handler invocations (Prepare, Execute, Cleanup steps for each job).
-  - Zowe CLI command invocations and responses (if verbose logging is captured from Zowe calls).
-  - Error messages and stack traces if issues occur during orchestration.
-  - Final summary generation messages.
-
-- **Purpose:** This is the primary log for diagnosing issues with workflows run via grace submit, as there is no direct terminal output from the background process.
+- Initialization messages.
+- Configuration loading and validation.
+- Graph building.
+- Executor state changes (jobs moving from PENDING to READY to DISPATCHING, etc.).
+- Job handler invocations (Prepare, Execute, Cleanup steps for each job).
+- Zowe CLI command invocations and responses (if verbose logging is captured from Zowe calls).
+- Error messages and stack traces if issues occur during orchestration.
+- Final summary generation messages.
 
 ## 5. Local staging directory (`.local-staging/`)
 
