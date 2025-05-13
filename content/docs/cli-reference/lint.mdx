@@ -1,5 +1,93 @@
 ---
-title: lint
+title: grace lint
+description: Validate the syntax and structure of a grace.yml workflow file.
 ---
 
-hi
+The `grace lint` command checks a `grace.yml` workflow definition file for correctness against Grace's schema and validation rules. It's an essential tool for catching configuration errors before attempting to deck or run a workflow.
+
+> `lint` performs static analysis of your `grace.yml` and does **not** interact with z/OS or execute any part of the workflow.
+
+---
+
+# Usage
+
+```sh
+grace lint
+```
+
+## Arguments
+
+### `[workflow-file]` (optional)
+
+- The path to the Grace workflow file you want to validate.
+- If omitted, `grace lint` defaults to looking for a file named `grace.yml` in the current directory.
+
+## Flags
+
+### `-h, --help`
+
+- Displays help information for the `lint` command.
+
+---
+
+# What it checks
+
+`grace lint` performs a comprehensive set of validations, including but not limited to:
+
+- **YAML syntax**: Ensures the file is valid YAML.
+- **Required fields**: Checks for the presence of mandatory fields at global, `config`, `datasets`, and individual jobs levels (e.g., `config.profile`, `datasets.jcl`, `job.name`, `job.type`).
+- **Data types**: Verifies that field values conform to their expected data types (e.g., `config.concurrency` is an integer).
+- **Dataset naming conventions**: Validates that DSNs specified in `datasets` (and job-level overrides) adhere to z/OS naming rules (qualifier length, character set, number of qualifiers).
+- **PDS member names**: Ensures job.name and other fields used as PDS member names (like job.program for link-edit output) are valid.
+- **Job types**: Verifies that job.type is a known and registered job handler type (e.g., compile, linkedit, execute, shell).
+- **Handler-specific validation**: Each job handler performs its own validation for job-specific fields. For example:
+  - `shell` jobs: Checks for the `with` block and that either `script` or `inline` is provided.
+  - `execute` jobs: Checks for a valid program field and that a load library is defined.
+  - `compile` jobs: Checks for necessary inputs/outputs.
+- **Input/output definitions**:
+  - Ensures `name` (DDName) and `path` (virtual path) are present for each input/output.
+  - Validates DDName format.
+  - Validates virtual path scheme (e.g., `src://`, `zos://`, `zos-temp://`, `file://`, `local-temp://`).
+  - Checks for duplicate DDNames within a single job's inputs or outputs.
+  - Checks for conflicts where an output DDName is the same as an input DDName in the same job.
+- **Dependency resolution**:
+  - Ensures that all jobs listed in a `depends_on` array exist.
+  - Checks that a job does not depend on itself.
+- **Dependency cycles**: Detects circular dependencies between jobs (e.g., Job A depends on Job B, and Job B depends on Job A).
+- **virtual path production**:
+  - Ensures that `zos-temp://` and `local-temp://` input paths are produced by an output of some job in the workflow.
+  - Warns or errors if multiple jobs attempt to produce the exact same `zos-temp://` or `local-temp://` virtual path.
+
+---
+
+# Output
+
+If valid:
+
+```sh
+Linting file: grace.yml
+✓ grace.yml is valid!
+```
+
+If invalid:
+
+```sh
+Linting file: grace.yml
+✖ Validation failed:
+- job[0] (name: "CMPHELLO"): field 'type' is required
+- job[1] (name: "LNKHELLO"): dependency "CMPHELO" not found (did you mean "CMPHELLO"?)
+- datasets.jcl: qualifier 'MYJCLTOOLONG' exceeds 8 characters
+```
+
+---
+
+# When to use
+
+- **Early and often**: Run grace lint frequently as you develop your grace.yml file.
+- **Before `grace deck`**: Ensure your configuration is valid before attempting to sync your local workspace to your target z/OS environment.
+- **Before `grace run` or `grace submit`**: Catch errors before initiating actual job execution.
+- **In CI/CD pipelines**: Integrate `grace lint` as an automated check to ensure workflow definitions merged into your codebase are valid.
+
+---
+
+By using `grace lint`, you can significantly reduce the time spent debugging configuration issues and gain confidence in your workflow definitions.
