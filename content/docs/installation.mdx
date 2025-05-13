@@ -17,7 +17,7 @@ This script will:
 - Download the latest compatible binary from GitHub
 - Install it to `/usr/local/bin/grace`
 
-Once it’s done, verify with:
+Once it's done, verify with:
 
 ```sh
 grace --version
@@ -31,16 +31,16 @@ Grace provides prebuilt binaries for macOS, Linux, and Windows via [GitHub Relea
 
 1. Visit the [Releases page](https://github.com/graceinfra/grace/releases)
 2. Download the binary for your platform:
-    - `grace-macos-amd64` or `grace-macos-arm64`
-    - `grace-linux-amd64`
-    - `grace-windows.exe`
+   - `grace-macos-amd64` or `grace-macos-arm64`
+   - `grace-linux-amd64`
+   - `grace-windows.exe`
 3. Rename and move the binary to your `$PATH`. For example on macOS or Linux:
 
-    ```sh
-    mv grace-macos-arm64 grace  
-    chmod +x grace  
-    sudo mv grace /usr/local/bin/
-    ```
+   ```sh
+   mv grace-macos-arm64 grace
+   chmod +x grace
+   sudo mv grace /usr/local/bin/
+   ```
 
 4. Test it:
 
@@ -56,26 +56,26 @@ If you want the latest development version, you can build from source.
 
 **Prerequisite**: Go 1.21+ must be installed.
 
-1. Clone the repo:  
+1. Clone the repo:
 
    ```sh
    git clone https://github.com/graceinfra/grace.git
    ```
 
-2. Build the CLI:  
+2. Build the CLI:
 
    ```sh
-   cd grace  
-   go build -o grace ./cmd/grace
+   cd grace
+   go build -o grace main.go
    ```
 
-3. Install it:  
+3. Install it:
 
    ```sh
    sudo mv grace /usr/local/bin/
    ```
 
-4. Confirm installation:  
+4. Confirm installation:
 
    ```sh
    grace --version
@@ -85,7 +85,7 @@ If you want the latest development version, you can build from source.
 
 ## Verifying Your Install
 
-Run:  
+Run:
 
 ```sh
 grace init --help

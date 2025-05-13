@@ -16,16 +16,19 @@ export default function HomePage() {
               <div className="relative space-y-4 backdrop-blur-sm">
                 <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none bg-clip-text text-transparent bg-gradient-to-b from-black to-neutral-600 dark:from-white dark:to-neutral-400 drop-shadow-sm">
                   The cloud just made
-                  <br />
-                  a new friend
+                  <br />a new friend
                 </h1>
                 <p className="mx-auto max-w-[700px] text-zinc-600 dark:text-zinc-300 md:text-xl leading-relaxed">
-                Turn your mainframe into just another backend. Grace makes it stupid simple to integrate z/OS with modern data pipelines and cloud workflows.
+                  Turn your mainframe into just another backend. Grace makes it
+                  stupid simple to integrate z/OS with modern data pipelines and
+                  cloud workflows.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
-                <Link href="/docs/tutorials/hello-grace">
-                  <Button className="h-11 px-8 gap-1.5 group">Get Started</Button>
+                <Link href="/docs/tutorials">
+                  <Button className="h-11 px-8 gap-1.5 group">
+                    Get Started
+                  </Button>
                 </Link>
                 <Link href="/docs">
                   <Button variant="outline" className="h-11 px-8">
@@ -36,26 +39,45 @@ export default function HomePage() {
             </div>
             <div className="relative w-full max-w-2xl rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-black/80 backdrop-blur-xl shadow-2xl shadow-zinc-200/20 dark:shadow-zinc-800/20 p-6 mx-auto ring-1 ring-zinc-900/5 dark:ring-white/10">
               <pre className="overflow-x-auto text-sm font-mono text-left">
-              <code className="text-zinc-700 dark:text-zinc-300">
-  <span className="text-zinc-500 dark:text-zinc-400">$</span> grace init --profile zosmf{"\n"}
-  <span className="text-green-500">✓</span> Workspace initialized{"\n"}
-  {"\n"}
-  <span className="text-zinc-500 dark:text-zinc-400">$</span> grace deck{"\n"}
-  <span className="text-green-500">✓</span> Generated JCL: deck/transform.jcl{"\n"}
-  <span className="text-green-500">✓</span> Synced datasets: HLQ.DECK.TRANSFORM, HLQ.INPUT.DATA{"\n"}
-  {"\n"}
-  <span className="text-zinc-500 dark:text-zinc-400">$</span> grace run{"\n"}
-  <span className="text-green-500">✓</span> Fetched CSV → HLQ.INPUT.DATA{"\n"}
-  <span className="text-green-500">✓</span> COBOL job success: transform.jcl{"\n"}
-  <span className="text-green-500">✓</span> Exported output.csv → s3://vsam-migration-staging/{"\n"}
-  {"\n"}
-  <span className="text-zinc-500 dark:text-zinc-400">$</span> grace logs JOB12345{"\n"}
-  <span className="text-green-500">✓</span> RC=0000 | z/OS → cloud ☑️
-  {"\n"}
-  {"\n"}
-  <span className="text-zinc-500 dark:text-zinc-400">$</span>{" "}
-  <span className="inline-block w-2 h-4 -mb-0.5 bg-zinc-600 dark:bg-zinc-400 animate-[blink_1s_step-end_infinite]"></span>
-</code>
+                <code className="text-zinc-700 dark:text-zinc-300">
+                  <span className="text-zinc-500 dark:text-zinc-400">$</span>{" "}
+                  grace init --profile zosmf{"\n"}
+                  <span className="text-green-500">✓</span> Workspace
+                  initialized{"\n"}
+                  {"\n"}
+                  <span className="text-zinc-500 dark:text-zinc-400">
+                    $
+                  </span>{" "}
+                  grace deck{"\n"}
+                  <span className="text-green-500">✓</span> Generated JCL:
+                  deck/transform.jcl{"\n"}
+                  <span className="text-green-500">✓</span> Synced datasets:
+                  HLQ.DECK.TRANSFORM, HLQ.INPUT.DATA{"\n"}
+                  {"\n"}
+                  <span className="text-zinc-500 dark:text-zinc-400">
+                    $
+                  </span>{" "}
+                  grace run{"\n"}
+                  <span className="text-green-500">✓</span> Fetched CSV →
+                  HLQ.INPUT.DATA{"\n"}
+                  <span className="text-green-500">✓</span> COBOL job success:
+                  transform.jcl{"\n"}
+                  <span className="text-green-500">✓</span> Exported output.csv
+                  → s3://vsam-migration-staging/{"\n"}
+                  {"\n"}
+                  <span className="text-zinc-500 dark:text-zinc-400">
+                    $
+                  </span>{" "}
+                  grace logs JOB12345{"\n"}
+                  <span className="text-green-500">✓</span> RC=0000 | z/OS →
+                  cloud ☑️
+                  {"\n"}
+                  {"\n"}
+                  <span className="text-zinc-500 dark:text-zinc-400">
+                    $
+                  </span>{" "}
+                  <span className="inline-block w-2 h-4 -mb-0.5 bg-zinc-600 dark:bg-zinc-400 animate-[blink_1s_step-end_infinite]"></span>
+                </code>
               </pre>
             </div>
           </div>

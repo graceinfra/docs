@@ -1,3 +1,10 @@
 {
-  "pages": ["introduction", "installation", "tutorials/", "cli-reference/", "directory-layout/", "yaml-spec/"]
+  "pages": [
+    "installation",
+    "configuration",
+    "tutorials/",
+    "cli-reference/",
+    "directory-layout/",
+    "yaml-spec/"
+  ]
 }

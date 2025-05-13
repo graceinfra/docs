@@ -85,20 +85,20 @@ For now, simply ensure your compiler, linker, and dataset configurations match t
 
 ```yaml
 config:
-  profile: zosmf                    # your configured Zowe profile name
+  profile: zosmf # your configured Zowe profile name
   defaults:
     compiler:
-      pgm: IGYCRCTL                 # site-specific COBOL compiler
+      pgm: IGYCRCTL # site-specific COBOL compiler
       parms: "OBJECT,NODECK,LIB"
-      steplib: IGY.V6R4M0.SIGYCOMP  # site-specific steplib
+      steplib: IGY.V6R4M0.SIGYCOMP # site-specific steplib
     linker:
       pgm: IEWL
       parms: "LIST,MAP,XREF"
 
 datasets:
-  jcl: IBMUSER.GRC.HELLO.JCL 	    # target PDS for JCL
-  src: IBMUSER.GRC.HELLO.SRC 	    # target PDS for COBOL source files
-  loadlib: IBMUSER.LOAD             # site-specific loadlib
+  jcl: IBMUSER.GRC.HELLO.JCL # target PDS for JCL
+  src: IBMUSER.GRC.HELLO.SRC # target PDS for COBOL source files
+  loadlib: IBMUSER.LOAD # site-specific loadlib
 ```
 
 See the [YAML spec](/docs/category/yaml-spec) for more information on `grace.yml` fields.
@@ -124,7 +124,7 @@ jobs:
         path: src://hello.cbl
     outputs:
       - name: SYSLIN
-        path: temp://hello.obj
+        path: zos-temp://hello.obj
 
   - name: LNKHELLO
     type: linkedit
@@ -132,7 +132,7 @@ jobs:
     program: HELLO
     inputs:
       - name: SYSLIN
-        path: temp://hello.obj
+        path: zos-temp://hello.obj
 
   - name: RUNHELLO
     type: execute
@@ -154,9 +154,9 @@ jobs:
 
 To dive deeper, see [YAML Spec - Jobs](/docs/yaml-spec/jobs) for job types, configuring dependencies and concurrency, and advanced chaining techniques.
 
-> Prefix `temp://` is a platform agnostic virtual mount path. It denotes intermediate datasets between jobs that are handled behind the scenes by Grace. The engine will provision datasets, wire dependencies, and handle cleanup automatically.
+> `zos-temp://` is a platform agnostic virtual mount path. It denotes intermediate datasets between jobs that are handled behind the scenes by Grace. The engine will provision datasets, wire dependencies, and handle cleanup automatically.
 >
-> In a production workflow, you might have virtual `temp://` paths holding data between mainframe operations, cloud endpoints, local scripts, and so on.
+> In a production workflow, you might have many `zos-temp://` and `local-temp://` paths performing file handoff between mainframe operations, cloud endpoints, local scripts, and so on.
 >
 > To learn more about how this works, see LINK TODO HERE.
 
