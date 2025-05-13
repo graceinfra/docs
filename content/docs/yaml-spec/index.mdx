@@ -1,5 +1,70 @@
 ---
-title: Yaml Specification
+title: YAML Specification
+description: The grace.yml workflow file format and its components.
 ---
 
-placeholder
+The `grace.yml` file is the heart of every Grace workflow. It uses a declarative YAML syntax to define your automation pipelines, specifying global configurations, z/OS dataset mappings, individual job steps, their dependencies, and how data flows between them.
+
+This section provides a detailed reference for all the blocks, fields, and options available when constructing your `grace.yml` file. Understanding this specification will allow you to leverage the full power and flexibility of Grace.
+
+---
+
+## Core Structure
+
+The `grace.yml` file is organized into distinct top-level sections that define different aspects of your workflow.
+
+<Cards>
+  <Card href="/docs/yaml-spec/config" title="Config Block">
+    Define global settings for your workflow, including Zowe profiles,
+    concurrency limits, toolchain defaults, and cleanup behavior.
+  </Card>
+  <Card href="/docs/yaml-spec/datasets" title="Datasets Block">
+    Specify default z/OS dataset names (PDS/PDSE) for JCL, source code, and load
+    libraries used by Grace.
+  </Card>
+  <Card href="/docs/yaml-spec/jobs" title="Jobs Block">
+    Understand the overall structure of the `jobs` array and the common fields
+    applicable to all job types, such as `name`, `type`, and `depends_on`.
+  </Card>
+</Cards>
+
+---
+
+## Job Definitions & Data Flow
+
+Dive deeper into how jobs are defined, how they interact, and how data is managed.
+
+<Cards>
+  <Card href="/docs/yaml-spec/virtual-paths" title="Virtual Paths & Data Flow">
+    Learn about Grace's virtual path prefixes (`src://`, `zos://`,
+    `zos-temp://`, etc.) and how `inputs` and `outputs` define data dependencies
+    and flow.
+  </Card>
+  <Card href="/docs/yaml-spec/jobs-zos-specifics" title="z/OS Job Specifics">
+    Explore fields common to z/OS job types (`compile`, `linkedit`, `execute`),
+    such as `jcl` source definition, `program` specification, and `overrides`
+    for toolchains.
+  </Card>
+</Cards>
+
+---
+
+## Job Type Specifications
+
+Detailed reference for the parameters and behavior of each built-in job type.
+
+<Cards>
+  <Card href="/docs/yaml-spec/jobs/compile" title="Compile Jobs">
+    Configuration for compiling source code (e.g., COBOL, PL/I) on z/OS.
+  </Card>
+  <Card href="/docs/yaml-spec/jobs/linkedit" title="Link-Edit Jobs">
+    Configuration for link-editing object code into executable load modules.
+  </Card>
+  <Card href="/docs/yaml-spec/jobs/execute" title="Execute Jobs">
+    Configuration for running programs or batch jobs on z/OS.
+  </Card>
+  <Card href="/docs/yaml-spec/jobs/shell" title="Shell Jobs">
+    Configuration for executing local shell commands and scripts, including the
+    `with` block.
+  </Card>
+</Cards>

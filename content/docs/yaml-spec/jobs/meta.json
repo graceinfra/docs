@@ -1,4 +1,4 @@
 {
   "title": "Jobs",
-  "pages": ["compile", "execute", "linkedit", "shell"]
+  "pages": ["compile", "execute", "linkedit", "shell", "zos-specifics"]
 }

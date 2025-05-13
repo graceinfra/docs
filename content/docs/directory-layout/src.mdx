@@ -25,7 +25,7 @@ your-workflow-name/
 
 The primary purpose of the `src/` directory is to hold files that are referenced in your `grace.yml` job definitions using the `src://` virtual path prefix.
 
-- **Mainframe source code:** This typically includes COBOL programs, PL/I programs, Assembler source, copybooks, includes, BMS maps, MFS screens, etc. When referenced by a `compile` job or similar, Grace will upload these to the z/OS dataset specified in your `datasets.src` configuration (or a job-level override).
+- **Mainframe source code:** This typically includes COBOL programs, PL/I programs, Assembler source, copybooks, includes, BMS maps, MFS screens, etc. When referenced by a `compile` job or similar, Grace will upload these to the z/OS dataset specified in your [datasets.src](/docs/yaml-spec/datasets#src) configuration (or a [job-level override](/docs/yaml-spec/jobs#overrides)).
 - **Scripts for `shell` jobs:** If a `shell` job type uses `with.script: src://myscript.sh`, Grace will look for `myscript.sh` in the `src/` directory.
 - **Other local files:** You can also organize other local files here that might be used as inputs by `shell` job steps or other local processing, although no strict rule enforces this beyond convention.
 

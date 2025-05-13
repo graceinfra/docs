@@ -1,0 +1,8 @@
+---
+title: Linkedit
+description: Defining a 'linkedit' job module in your grace.yml to create executable load modules on z/OS.
+---
+
+The `linkedit` job module is used to invoke the linkage editor on z/OS. Its primary purpose is to process object decks (typically from a `compile` step) and other inputs (like control statements or other object modules/load modules) to produce an executable load module in a specified load library.
+
+Grace uses settings from the global [`config.defaults.linker`](/docs/yaml-spec/config#defaults) block, which can be optionally overridden at the job level using the [`overrides.linker`](/docs/yaml-spec/jobs#overrides) block within this job definition.

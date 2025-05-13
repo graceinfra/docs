@@ -96,12 +96,12 @@ An example snippet from a z/OS job's JSON log:
 
 ## 3. Workflow summary (`summary.json`)
 
-At the end of every workflow execution (whether it succeeds, fails, or is partially completed), Grace generates a summary.json file in the root of the run-specific log directory.
+At the end of every workflow execution (whether it succeeds, fails, or is partially completed), Grace generates a `summary.json` file in the root of the run-specific log directory.
 
 - **Content:** This file provides a high-level overview of the entire workflow run, including:
   - `workflow_id`, `workflow_start_time`, `grace_cmd` used.
   - `zowe_profile`, `hlq`, `initiator` details.
-  - An array of jobs, where each entry is a concise summary for a job (name, job_id, type, final status, return code, timings, relative path to its detailed JSON log).
+  - An array of jobs, where each entry is a concise summary for a job (`name`, `job_id`, `type`, final `status`, return code, timings, relative path to its detailed JSON log).
   - `overall_status` of the workflow (e.g., "Success", "Failed", "Partial", "Skipped").
   - `total_duration_ms` for the workflow.
   - Counts for `jobs_succeeded` and `jobs_failed`.

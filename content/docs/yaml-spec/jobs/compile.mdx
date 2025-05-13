@@ -1,3 +1,133 @@
 ---
 title: Compile
+description: Defining a 'compile' job module in your grace.yml to compile source code on z/OS.
 ---
+
+The `compile` job module is used to invoke a compiler on z/OS to process source code (e.g., COBOL, PL/I, Assembler) and produce an object deck or other compiler outputs.
+
+Grace uses the settings from the global [`config.defaults.compiler`](/docs/yaml-spec/config#defaults) block, which can be optionally overridden at the job level using the [`overrides.compiler`](/docs/yaml-spec/jobs#overrides) block within this job definition.
+
+```yaml
+jobs:
+  - name: CMPMYPGM
+    type: compile
+    program:
+      MYPROG # Optional metadata; not directly used to name the PGM= for compiler
+      # but can be useful if subsequent link-edit implicitly uses it.
+    jcl: file://custom_compile.jcl.tmpl
+    overrides:
+      compiler:
+        parms: "NODECK,OBJECT,MAP,XREF" # Override default compiler parameters
+        steplib: "USER.COBOL.V6R3.LOADLIB" # Override default compiler STEPLIB
+    inputs:
+      - name: SYSIN
+        path: src://myprog.cbl # Primary source code
+      - name: COPYLIB
+        path: zos://COMMON.COPYLIB.PDS
+        disp: SHR
+    outputs:
+      - name: SYSLIN # Standard DDName for object deck output
+        path: zos-temp://myprog.obj
+      - name: SYSPRINT
+        path: zos-temp://cmpprint.txt # Capture compiler listing
+        keep: true # Keep this temporary dataset for review
+```
+
+---
+
+While `compile` jobs use [common job fields](/docs/yaml-spec/jobs) like `name`, `depends_on`, etc. and [z/OS specific fields](#) like `jcl`, `program`, and `overrides`, the following are particularly relevant or have specific implications for `type: compile`.
+
+## `type`
+
+- **Value:** `compile` (Required)
+- **Description:** Identifies this job as a compilation task. Grace will use its internal `ZosCompileHandler` to manage its execution.
+
+---
+
+## `program` (Optional metadata)
+
+- **Type:** `String`
+- **Description:** For a `compile` job, the `program` field is primarily metadata. The actual compiler program (e.g. `IGYCRCTL`) is determined by [`config.defaults.compiler.pgm`](/docs/yaml-spec/config#defaults) or [`job.overrides.compiler.pgm`](/docs/yaml-spec/jobs#overrides).
+
+> If you follow a convention where a `compile` job for `MYPROG` is expected to produce an object deck that a subsequent `linkedit` job (also with `program: MYPROG`) will use - specifying it here can improve clarity. It's available as `{{ .ProgramName }}` in [JCL templates](/docs/jcl-templates).
+
+---
+
+## `jcl` (Optional)
+
+- **Type:** `String`
+- **Description:** Specifies the source of the JCL for this compile job.
+  - **Omitted:** Grace uses its internal default `compile.jcl.tmpl` template.
+  - `file://path/to/your_compile.jcl.tmpl`: Uses your local JCL file (static or templated).
+  - `zos://MY.PDS.JCL(COMPILEJ)`: Uses an existing JCL member on the mainframe.
+
+> See [z/OS Job Specifics](/docs/yaml-spec/jobs/zos-specifics) and [JCL Templates](/docs/jcl-templates) for more details.
+
+---
+
+## `overrides.compiler` (Optional)
+
+```yaml
+overrides:
+  compiler:
+    parms: "RENT,ADV,OPTIMIZE"
+    steplib: "TEST.COBOL.LOADLIB"
+```
+
+- **Type:** `Object`
+- **Description:** Allows you to specify compiler `pgm`, `parms`, or `steplib` settings that override the global [`config.defaults.compiler`](/docs/yaml-spec/config#defaults) for this job.
+
+---
+
+## `inputs`
+
+- **Description:** Defines the inputs to the compiler.
+- **Common `name` (DDName) values for compilers:**
+  - `SYSIN` _(Standard)_ : The primary source code file to be compiled.
+    - e.g. `path: src://myprog.cbl`
+  - `COPYLIB` / `SYSLIB` / **custom DDs for copybooks**: To specify PDS(E) libraries containing copybooks or include members.
+    - e.g. `path: zos://SHARED.COPYLIB.PDS`
+    - e.g. `path: src://copybook.cpy` (if Grace should upload `src/projectcopy.cpy` to `datasets.src(PROJECTCOPY)` which is then included in a [concatenated DD](/docs/jcl-templates#concatenatedDD) like `SYSLIB` in the JCL template)
+      - Note: Your JCL template must be designed to handle such concatenated DDs if multiple `src://` copybooks are uploaded to the same `datasets.src`.
+
+> See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths) for details on `path` prefixes.
+
+---
+
+## `outputs`
+
+- **Description:** Defines the outputs produced by the compiler.
+- **Common `name` (DDName) values for compilers:**
+  - `SYSLIN` _(Standard)_ : The object deck produced by the compiler.
+    - e.g. `path: zos-temp://myprog.obj`
+  - `SYSPRINT` / `SYSDEBUG` / etc.: For compiler listings, diagnostic messages, or other output files.
+    - e.g. `path: zos-temp://compiler.listing.txt`
+    - e.g. `path: file://logs/compiler_output.txt`
+
+> See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths) for details on `path` prefixes.
+
+---
+
+# JCL generation context
+
+When Grace generates JCL for a compile job (either using its internal template or a user-provided `jcl: file://` template), the following specific data related to compiler settings is made available to the template, in addition to common job data:
+
+- `{{ .CompilerPgm }}`: The resolved compiler program name.
+- `{{ .CompilerParms }}`: The resolved compiler parameters.
+- `{{ .CompilerSteplib }}`: The resolved compiler `STEPLIB` DSN (empty string if none).
+
+These are derived from [`config.defaults.compiler`](/docs/yaml-spec/config#defaults) or [`job.overrides.compiler`](/docs/yaml-spec/jobs#overrides).
+
+> Refer to the [JCL Templating Guide](/docs/jcl-templates) for a full list of variables available in JCL templates.
+
+---
+
+# Behavior notes
+
+- **Source upload:** If `SYSIN` or other inputs use `src://` paths, `grace deck` will upload these local files to the PDS defined in [`datasets.src`](/docs/yaml-spec/datasets#src) (or its [job-level override](/docs/yaml-spec/jobs#overrides)). The generated JCL will then point to these uploaded members.
+- **Object deck handling:** The `SYSLIN` ouput, typically specified with a `zos-temp://` path, is crucial as it's usually consumed by a subsequent `linkedit` job. Grace automatically manages the DSN and cleanup for this temporary dataset.
+- **Return codes:** Successful compilations usually result in a return code of `0000` or `0004` (warnings). Higher return codes often indicate errors. Grace's executor logic uses these to determine jobs success or failure.
+
+---
+
+By configuring a `compile` job module, you can integrate source code compilation on z/OS seamlessly into your automated Grace workflows.

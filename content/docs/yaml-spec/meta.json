@@ -1,3 +1,4 @@
 {
-  "title": "YAML Specification"
+  "title": "YAML Specification",
+  "pages": ["config", "datasets", "jobs", "virtual-paths"]
 }
