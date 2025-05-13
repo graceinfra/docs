@@ -18,6 +18,18 @@ const ibmPlexMono = IBM_Plex_Mono({
 export default function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} ${ibmPlexSans.className}`} suppressHydrationWarning>
+      <head>
+        <link
+          rel="icon"
+          href="/static/favicon.svg"
+          media="(prefers-color-scheme: light)"
+        />
+        <link
+          rel="icon"
+          href="/static/favicondark.svg"
+          media="(prefers-color-scheme: dark)"
+        />
+      </head>
       <body className="flex flex-col min-h-screen">
         <RootProvider>{children}</RootProvider>
       </body>
