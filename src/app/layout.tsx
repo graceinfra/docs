@@ -21,12 +21,12 @@ export default function Layout({ children }: { children: ReactNode }) {
       <head>
         <link
           rel="icon"
-          href="/static/favicon.svg"
+          href="/favicon.svg"
           media="(prefers-color-scheme: light)"
         />
         <link
           rel="icon"
-          href="/static/favicondark.svg"
+          href="/favicondark.svg"
           media="(prefers-color-scheme: dark)"
         />
       </head>

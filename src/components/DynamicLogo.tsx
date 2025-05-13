@@ -16,7 +16,7 @@ export const DynamicLogo = () => {
   if (!mounted) {
     return (
       <Image
-        src="/static/favicon.svg"
+        src="/favicon.svg"
         width={24}
         height={24}
         alt="Grace Logo"
@@ -27,7 +27,7 @@ export const DynamicLogo = () => {
 
   return (
     <Image
-      src={resolvedTheme === 'dark' ? '/static/favicondark.svg' : '/static/favicon.svg'}
+      src={resolvedTheme === 'dark' ? '/favicondark.svg' : '/favicon.svg'}
       width={24}
       height={24}
       alt="Grace Logo"
