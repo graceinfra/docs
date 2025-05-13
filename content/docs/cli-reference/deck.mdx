@@ -1,5 +1,138 @@
 ---
-title: deck
+title: grace deck
+description: Synchonize your local environment and workflow artifacts to z/OS.
 ---
 
-hi
+The `grace deck` command is an important step in preparing your Grace workflow for execution on z/OS. It processes your `grace.yml` file, generates the necessary Job Control Language (JCL) for mainframe jobs, and uploads both the generated JCL and any specified local source files (e.g., COBOL programs via `src://` paths) to the target datasets on your z/OS system.
+
+> Think of `grace deck` as the "staging" or "deployment" phase for your mainframe artifacts before they are actually run.
+
+---
+
+# Usage
+
+```bash
+grace deck [flags]
+```
+
+## Arguments
+
+`grace deck` does not take any direct arguments other than flags. By default, it looks for `grace.yml` in the current directory.
+
+## Flags
+
+### `--only [job_names]`
+
+- Specify one or more jobs to process. Only these jobs will have their JCL generated and/or artifacts uploaded.
+- If multiple jobs are specified, separate them with commas or use the flag multiple times.
+- Example: `grace deck --only CMPHELLO,LNKHELLO`
+- Example: `grace deck --only CMPHELLO --only LNKHELLO`
+
+### `--no-compile`
+
+- Optional boolean flag.
+- If set, Grace will **skip the JCL generation/rendering phase**.
+  - For jobs where Grace would normally generate JCL (i.e., `jcl:` field is empty), no JCL is written to the local `.grace/deck/` directory. If a JCL file for that job existed there from a previous run, it remains untouched. If `--no-upload` is _not_ also set, Grace will attempt to upload this pre-existing local JCL file if found.
+  - For jobs using `jcl: file://path/to/some.jcl.tmpl`, Grace will use the content of `path/to/some.jcl.tmpl` **as-is, without attempting to render it as a template**. This raw content is written to `.grace/deck/` and then potentially uploaded.
+  - For jobs using `jcl: file://path/to/static.jcl` (a non-template file), this flag behaves similarly: the static content is read, written to `.grace/deck/`, and then potentially uploaded. The "compilation/rendering" step was already a no-op for a truly static file.
+  - For jobs using `jcl: zos://dsn(member)`, this flag has no effect on the JCL itself, as Grace doesn't generate JCL for such jobs anyway.
+- This flag is useful if you have manually edited the JCL files in `.grace/deck/` and want to upload those specific versions, or if you want to upload a JCL template file itself rather than its rendered output.
+
+### `--no-upload`
+
+- Optional boolean flag.
+- If set, Grace will perform all JCL generation/rendering and local file preparation (writing to `.grace/deck/`) as usual (unless `--no-compile` is also set), but it will **skip all upload steps** to z/OS.
+- This means neither the JCL files from `.grace/deck/` nor any source files specified via `src://` in your `grace.yml` inputs will be uploaded to the mainframe.
+- Useful for inspecting locally generated JCL or for workflows that only involve local processing.
+
+### `-v`, `--verbose`
+
+- Optional boolean flag.
+- Enables verbose logging output to `stderr`, providing more detailed information about the JCL generation process, Zowe CLI calls (like dataset checks and uploads), and path resolutions.
+- This is a global flag inherited by all Grace commands.
+
+### `-h`, `--help`
+
+- Displays help information for the `deck` command.
+
+---
+
+# What it does
+
+When you run `grace deck` (without `--no-compile` or `--no-upload`):
+
+1.  **Parses `grace.yml`**: Reads and validates your workflow definition.
+2.  **Resolves paths**: Determines the actual DSNs for `zos-temp://` outputs.
+3.  **JCL generation/processing (for each ZOS-type job, unless `jcl: zos://...`):**
+    - **If `jcl:` field is empty:** Grace uses its internal JCL template for the job type (`compile`, `linkedit`, `execute`). It prepares the necessary data (resolved program names, library names, input/output DSNs from `grace.yml`) and renders the JCL.
+    - **If `jcl: file://path/to/jcl_or_template`:** Grace reads the specified local file. If it contains Go template syntax, it's rendered using data prepared from `grace.yml`. If it's plain JCL, it's used as-is.
+    - The resulting JCL for each job is written to a corresponding file in the `.grace/deck/` directory (e.g., `.grace/deck/MYJOB.jcl`).
+4.  **Ensures target datasets exist**:
+    - For the global JCL PDS (`datasets.jcl` in `grace.yml`), Grace ensures it exists, creating it if necessary.
+    - For the global or job-specific source PDS (`datasets.src`), Grace ensures it exists if `src://` inputs are defined for upload.
+    - The global load library (`datasets.loadlib`) is checked for existence but not automatically created by `deck`.
+5.  **Uploads artifacts to z/OS**:
+    - **JCL**: The generated/processed JCL from `.grace/deck/JOBNAME.jcl` is uploaded to the corresponding member `datasets.jcl(JOBNAME)` on the mainframe. This step is skipped if the job uses `jcl: zos://...`.
+    - **Source Files**: Any local files specified in `job.inputs` with a `path: src://filename.ext` are uploaded from your local `src/` directory to the effective `datasets.src(FILENAME)` PDS member on the mainframe.
+
+---
+
+# Idempotency
+
+`grace deck` is designed to be **idempotent** when it comes to JCL generation and uploads (assuming no changes to your `grace.yml` or local source/JCL files).
+
+- Running it multiple times will re-generate JCL (if not using `--no-compile`) and re-upload files.
+- The upload process typically involves deleting the target PDS member first and then uploading the new version, effectively replacing it.
+- `zowe.EnsurePDSExists` will only create a PDS if it doesn't already exist.
+
+This means you can safely run `grace deck` repeatedly to ensure your mainframe environment reflects the current state of your local Grace workflow definition.
+
+---
+
+# Output
+
+- Grace will log its actions to the console, indicating which JCL files are being generated, which datasets are being checked or created, and which files are being uploaded.
+- Locally, the `.grace/deck/` directory will be populated with the JCL files that Grace prepared.
+
+---
+
+# Examples
+
+1.  Deck all jobs defined in `grace.yml` (default behavior):
+
+    ```bash
+    grace deck
+    ```
+
+2.  Deck only the `CMPHELLO` and `LNKHELLO` jobs:
+
+    ```bash
+    grace deck --only CMPHELLO,LNKHELLO
+    ```
+
+3.  Generate JCL locally but do not upload anything to the mainframe:
+
+    ```bash
+    grace deck --no-upload
+    ```
+
+4.  Upload existing JCL from `.grace/deck/` and source files, without re-generating/re-rendering any JCL:
+
+    ```bash
+    grace deck --no-compile
+    ```
+
+5.  Only prepare local JCL in `.grace/deck/`, without re-generating and without uploading (useful for inspection only if files already exist or are user-provided templates):
+    ```bash
+    grace deck --no-compile --no-upload
+    ```
+
+---
+
+# When to use `grace deck`
+
+- After creating or modifying your `grace.yml`.
+- After changing any local source files (`src/*`) referenced in your workflow.
+- After changing any local JCL files or JCL templates referenced via `jcl: file://...`.
+- Before running `grace run` or `grace submit` to ensure the mainframe has the correct versions of your JCL and source code.
+- As part of a CI/CD pipeline to prepare mainframe artifacts before an automated execution step.

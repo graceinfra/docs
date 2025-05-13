@@ -1,5 +1,135 @@
 ---
-title: submit
+title: grace submit
+description: Submit a Grace workflow for asynchronous background execution.
 ---
 
-hi
+The `grace submit` command initiates the orchestration of a workflow from your `grace.yml` file in an **asynchronous, detached background process**. This allows you to submit long-running workflows without tying up your terminal session.
+
+Grace launches a new instance of itself in a specific background mode to manage the full orchestration, including dependency management, job submission, monitoring, and logging, identical to how [`grace run`](/docs/cli-reference/run) operates. The `grace submit` command itself returns quickly after successfully launching this background process.
+
+> Like `grace run`, `grace submit` assumes that all necessary JCL and source files have already been prepared and uploaded to the mainframe, typically by using the [`grace deck`](/docs/cli-reference/deck) command. It does not perform any JCL generation or file uploads.
+
+---
+
+# Usage
+
+```bash
+grace submit [flags]
+```
+
+## Arguments
+
+`grace submit` does not take any direct arguments other than flags. It operates on the `grace.yml` file in the current directory by default.
+
+## Flags
+
+### `--only [job_names]`
+
+- Specify one or more job names to execute in the background workflow. Only these jobs (and their precedent dependencies) will be submitted and run.
+- If multiple jobs are specified, separate them with commas or use the flag multiple times.
+- Example: `grace submit --only DEPLOYBATCH`
+- Example: `grace submit --only STEP1,STEP3`
+- The background process will manage the execution of these targeted jobs and their dependencies.
+
+### `-v`, `--verbose`
+
+- Optional boolean flag.
+- When `grace submit` is run, this flag enables verbose logging **for the `submit` command itself** to `stderr` as it launches the background process.
+- **Crucially, it also passes a `--verbose` flag to the detached background Grace process**, causing the detailed `workflow.log` in the log directory to be written at a DEBUG level. This is highly recommended for troubleshooting background runs.
+- This is a global flag inherited by all Grace commands.
+
+### `-h`, `--help`
+
+- Displays help information for the `submit` command.
+
+---
+
+# What it does
+
+When you execute `grace submit`, it:
+
+1.  **Loads and validates workflow:** Performs an initial load and validation of the `grace.yml` file to catch basic errors before attempting to launch a background process.
+2.  **Creates log directory:** A new unique, timestamped log directory is created under `.grace/logs/` (e.g., `.grace/logs/YYYYMMDDTHHMMSS_submit_[workflow-uuid]/`). This directory is where the background process will store all its logs.
+3.  **Determines Grace executable path:** Finds the path to the currently running `grace` executable.
+4.  **Prepares background arguments:** Constructs a set of internal arguments to pass to the new Grace process, including:
+    - `--internal-run`: A hidden flag that tells the new Grace instance to run in background orchestration mode.
+    - `--workflow-id`: The unique ID generated for this workflow run.
+    - `--cfg-path`: The absolute path to the `grace.yml` file being used.
+    - `--log-dir`: The absolute path to the log directory created in step 2.
+    - `--only` flags, if specified by the user, are passed through.
+    - `--verbose` flag, if specified by the user, is passed through.
+5.  **Launches detached background process:**
+    - Executes a new instance of the `grace` command with the prepared internal arguments.
+    - This new process is **detached** from the current terminal session (e.g., using `setsid` on Unix-like systems). This means it will continue to run even if you close your terminal or log out.
+    - Standard input, output, and error streams of the background process are disassociated from the terminal.
+6.  **Prints confirmation:** The `grace submit` command then prints a confirmation message to your terminal, typically including the Workflow ID and the path to the log directory, and exits.
+
+**The Detached Background Process then performs actions similar to `grace run`:**
+
+- Configures its logging to write to `workflow.log` within its assigned log directory.
+- Builds the execution graph.
+- Resolves paths.
+- Orchestrates job execution (submitting to z/OS, running shell scripts).
+- Logs detailed job execution records (`JOBID_JOBNAME.json`) and a final `summary.json` within its log directory.
+- Performs cleanup of temporary intermediate datasets.
+
+---
+
+# Output
+
+- **Terminal** (from `grace submit` command):
+
+  - Confirmation message upon successfully launching the background process.
+  - The unique **Workflow ID** for the submitted run.
+  - The **path to the log directory** where the background process will write its logs.
+  - Example:
+    ```bash
+    ✓ Configuration "grace.yml" loaded and validated.
+    INFO Logs for will be stored in: .grace/logs/20231027T143000_submit_[workflow-uuid]
+    INFO Launching background process...
+    ✓ Workflow submitted successfully.
+      Workflow ID: [workflow-uuid]
+      Logs will be written to: .grace/logs/20231027T143000_submit_[workflow-uuid]
+    ```
+
+- **File system** (generated by the background process):
+  - A new directory in `.grace/logs/` named like `YYYYMMDDTHHMMSS_submit_workflow-uuid/`.
+  - Inside this directory:
+    - `workflow.log`: A detailed log of the entire background orchestration process. Verbosity depends on whether `-v` was used with `grace submit`.
+    - Individual JSON log files for each job executed (e.g., `JOB01234_MYJOB.json`).
+    - A `summary.json` file for the entire workflow run.
+    - A `.local-staging/` subdirectory, if used by any `shell` jobs for data transfers.
+
+---
+
+# Examples
+
+1.  Submit all jobs in `grace.yml` for background execution:
+
+    ```bash
+    grace submit
+    ```
+
+2.  Submit the workflow with verbose logging for the background process:
+
+    ```bash
+    grace submit -v
+    ```
+
+3.  Submit only the job named `LONGTASK` for background execution:
+
+    ```bash
+    grace submit --only LONGTASK
+    ```
+
+---
+
+# Monitoring background workflows
+
+Since `grace submit` returns immediately, you need other ways to monitor the workflow:
+
+- **Check Log Files:** The primary method currently is to inspect the files in the log directory, especially `workflow.log` for overall progress and individual job logs for details.
+- **`grace status <workflow-id>` (Future):** A command to query the status of a submitted workflow is a planned feature.
+- **`grace dash` (Future):** A terminal-based dashboard for viewing active and completed workflows is also envisioned.
+
+Use `grace submit` for workflows that you don't need to watch execute in real-time or for integrating Grace into automated scripts and CI/CD systems.

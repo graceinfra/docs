@@ -1,15 +1,23 @@
 import './global.css';
 import { RootProvider } from 'fumadocs-ui/provider';
-import { Inter } from 'next/font/google';
+import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
 
-const inter = Inter({
+const ibmPlexSans = IBM_Plex_Sans({
+  weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
+  variable: '--font-ibm-plex-sans',
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ['400', '500', '600'],
+  subsets: ['latin'],
+  variable: '--font-ibm-plex-mono',
 });
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={inter.className} suppressHydrationWarning>
+    <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} ${ibmPlexSans.className}`} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen">
         <RootProvider>{children}</RootProvider>
       </body>

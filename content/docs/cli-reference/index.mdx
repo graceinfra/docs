@@ -1,5 +1,58 @@
 ---
 title: CLI Reference
+description: Explore the commands and options available in the Grace Command Line Interface.
 ---
 
-placeholder
+The Grace Command Line Interface (CLI) is your primary tool for interacting with Grace workflows. It allows you to initialize new projects, validate configurations, prepare mainframe artifacts, and execute your orchestration pipelines.
+
+Each command is designed to be intuitive and provide clear feedback. Use the `-h` or `--help` flag with any command or subcommand for specific assistance.
+
+---
+
+# Core
+
+Manage your Grace workflows from initialization to execution.
+
+<Cards>
+  <Card href="/docs/cli-reference/init" title="grace init">
+    Scaffold a new Grace workflow, including starter files and directory
+    structure.
+  </Card>
+  <Card href="/docs/cli-reference/lint" title="grace lint">
+    Validate the syntax and structural integrity of your `grace.yml` workflow
+    definition.
+  </Card>
+  <Card href="/docs/cli-reference/deck" title="grace deck">
+    Generate JCL, prepare local artifacts, and upload necessary files to your
+    z/OS system.
+  </Card>
+  <Card href="/docs/cli-reference/run" title="grace run">
+    Execute a defined workflow synchronously, with real-time monitoring and
+    terminal output.
+  </Card>
+  <Card href="/docs/cli-reference/submit" title="grace submit">
+    Submit a workflow for asynchronous execution in a detached background
+    process.
+  </Card>
+</Cards>
+
+---
+
+# Utility
+
+Additional commands for managing and observing your Grace environment.
+
+<Cards>
+  <Card href="/docs/cli-reference/logs" title="grace logs (TBD)">
+    Tail the logs of a running workflow.
+  </Card>
+  <Card href="/docs/cli-reference/summary" title="grace summary (TBD)">
+    Display or process workflow execution summaries.
+  </Card>
+  <Card href="/docs/cli-reference/status" title="grace status (TBD)">
+    Check the status of asynchronously submitted workflows.
+  </Card>
+  <Card href="/docs/cli-reference/version" title="grace version (TBD)">
+    Display the installed Grace CLI version (if not just `grace --version`).
+  </Card>
+</Cards>

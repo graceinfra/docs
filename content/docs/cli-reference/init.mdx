@@ -85,14 +85,14 @@ If run without `[workspace-name]` in an existing directory, these files/folders 
 
 ---
 
-## After grace init
+## After `grace init`
 
 1. Navigate into your new workflow directory (if one was created).
 2. **Review and edit** `grace.yml`:
-   - Crucially, ensure config.profile matches your working Zowe CLI profile.
+   - Crucially, ensure `config.profile` matches your working Zowe CLI profile.
    - Adjust `datasets` (JCL, SRC, LOADLIB HLQs and names) to suit your z/OS environment and naming conventions.
-   - Verify config.defaults.compiler and config.defaults.linker settings (PGM names, PARMs, STEPLIBs) match your site's COBOL compiler and Linkage Editor.
-3. **Add source files**: Place your COBOL programs or other source files into the src/ directory.
-4. **Validate**: Run grace lint to check your grace.yml for syntax and structural correctness.
+   - Verify `config.defaults.compiler` and `config.defaults.linker` settings (PGM names, PARMs, STEPLIBs) match your site's COBOL compiler and Linkage Editor.
+3. **Add source files**: Place your COBOL programs or other source files into the `src/` directory.
+4. **Validate**: Run `grace lint` to check your `grace.yml` for syntax and structural correctness.
 
 You are now ready to define jobs and use commands like `grace deck` and `grace run`.

@@ -101,7 +101,7 @@ datasets:
   loadlib: IBMUSER.LOAD # site-specific loadlib
 ```
 
-See the [YAML spec](/docs/category/yaml-spec) for more information on `grace.yml` fields.
+See the [YAML spec](/docs/yaml-spec) for more information on `grace.yml` fields.
 
 Hint: You can run `grace lint` to validate your `grace.yml` syntax.
 
@@ -177,7 +177,7 @@ This will:
 - **Ensure target datasets exist** and provision them automatically if not
 - **Upload COBOL source files and JCL** to the appropriate z/OS datasets
 
-> Command `grace deck` is **idempotent**. You can run it repeatedly to sync local workflow files to the mainframe without triggering job execution.
+> `grace deck` is **idempotent**. You can run it repeatedly to sync local workflow files to the mainframe without triggering job execution.
 
 You can inspect the `.grace/deck/` directory to view the JCL that will be submitted for each job. You can then fine tune them and run `grace deck --no-compile` to sync your local files **without overwriting them**.
 
@@ -201,7 +201,7 @@ This will:
 
 > If you are curious about what orchestration looks like in a hosted or asynchronous environment, see [grace submit](/docs/cli-reference/submit).
 
-> Command `grace run` does not upload or regenerate anything. It purely handles workflow orchestration and monitoring with the last datasets you decked.
+> `grace run` does not upload or regenerate anything. It purely handles workflow orchestration and monitoring with the last datasets you decked.
 
 ---
 

@@ -1,5 +1,111 @@
 ---
-title: run
+title: grace run
+description: Execute and monitor a Grace workflow on z/OS synchronously.
 ---
 
-hi
+The `grace run` command orchestrates the execution of a defined workflow from your `grace.yml` file. It submits jobs to the z/OS system in the specified order, respects dependencies, monitors their progress, and provides real-time feedback in your terminal.
+
+`grace run` operates **synchronously**, meaning the command will not exit until all jobs in the workflow have completed, failed, or been skipped. It assumes that all necessary JCL and source files have already been prepared and uploaded to the mainframe, typically by using the [`grace deck`](/docs/cli-reference/deck) command.
+
+> `grace run` does not perform any JCL generation or file uploads; it focuses purely on the execution and monitoring of the workflow as defined by the artifacts already present on the mainframe (as a result of a previous `grace deck`).
+
+---
+
+# Usage
+
+```bash
+grace run [flags]
+```
+
+## Arguments
+
+`grace run` does not take any direct arguments other than flags. It operates on the `grace.yml` file in the current directory by default.
+
+## Flags
+
+### `--only [job_names]`
+
+- Specify one or more job names to execute. Only these jobs will be submitted and run. Jobs not in this list will be effectively skipped by the orchestrator unless they are dependencies of a targeted job.
+- If multiple jobs are specified, separate them with commas or use the flag multiple times.
+- Example: `grace run --only RUNHELLO`
+- Example: `grace run --only CMPHELLO --only LNKHELLO`
+- The workflow summary will reflect that only the specified jobs (and their necessary precedents) were attempted.
+
+### `-v`, `--verbose`
+
+- Optional boolean flag.
+- Enables verbose logging output to `stderr`, providing more detailed information about the orchestration process, Zowe CLI calls, job states, and handler actions.
+- This is a global flag inherited by all Grace commands.
+
+### `-h`, `--help`
+
+- Displays help information for the `run` command.
+
+---
+
+# What it does
+
+When you execute `grace run`:
+
+1.  **Loads workflow:** Parses and validates the `grace.yml` configuration file, including checking job dependencies and syntax.
+2.  **Creates log directory:** A new unique, timestamped log directory is created under `.grace/logs/` (e.g., `.grace/logs/YYYYMMDDTHHMMSS_run_workflow-uuid/`). This directory will store detailed logs for each executed job and a final workflow summary.
+3.  **Builds execution graph:** Constructs an internal dependency graph of all jobs defined in the workflow.
+4.  **resolves paths:** Determines actual DSNs for `zos-temp://` inputs/outputs to ensure data flows correctly between jobs.
+5.  **Orchestrates job execution:**
+    - Iterates through the job graph, respecting dependencies.
+    - For each job eligible to run (i.e., its dependencies have successfully completed):
+      - The appropriate job handler (`compile`, `linkedit`, `execute`, `shell`) is invoked.
+      - **z/OS Jobs:** The handler instructs Zowe CLI to submit the JCL for the job. The JCL submitted is either:
+        - The one specified by `jcl: zos://dsn(member)` in `grace.yml`.
+        - Or, the JCL member `datasets.jcl(JOBNAME)` on the mainframe, which was previously uploaded by `grace deck` (this could be from Grace's default templates or a user's `jcl: file://...` definition).
+      - **Shell Jobs:** The handler executes the local script or inline commands defined in the `with` block, managing any specified data transfers for inputs/outputs.
+    - Grace monitors the status of submitted z/OS jobs (polling for completion, checking return codes) or waits for local shell commands to finish.
+6.  **Real-time feedback:** Streams job status updates, key log messages, and progress indicators to your terminal.
+7.  **Logs job details:** For each job executed, a detailed JSON execution record is saved in the created log directory (e.g., `JOBID_JOBNAME.json`). This includes submission details, final status, return codes, timings, and potentially stdout/stderr for shell jobs.
+8.  **Generates workflow summary:** Upon completion of all jobs (or failure of the workflow), a `summary.json` file is written to the log directory. This file provides an overview of the entire workflow execution, including the status of each job, overall workflow status, and timing information.
+9.  **Cleans temporary datasets:** If configured (default is to clean on success), Grace will delete any `zos-temp://` or `local-temp://` datasets/files that were created by jobs and not marked with `keep: true`.
+
+---
+
+# Output
+
+- **Terminal:**
+  - Real-time status updates for each job being dispatched, submitted, and completing.
+  - Information on job IDs and return codes.
+  - Final workflow completion message, indicating success or failure and the location of the log directory.
+- **File System:**
+  - A new directory in `.grace/logs/` containing:
+    - Individual JSON log files for each job executed (e.g., `JOB01234_MYJOB.json`).
+    - A `summary.json` file for the entire workflow.
+    - A `workflow.log` file containing terminal logs (with **all** log debug levels regardless of the `--verbose` flag)
+    - A `.local-staging/` subdirectory within the log directory, used for temporary local files during `shell` job data transfers.
+
+---
+
+# Examples
+
+1.  **Run all jobs in the `grace.yml` of the current directory:**
+
+    ```bash
+    grace run
+    ```
+
+2.  **Run the workflow with verbose output:**
+
+    ```bash
+    grace run -v
+    ```
+
+3.  **Run only the job named `DEPLOYAPP` (and its dependencies):**
+    ```bash
+    grace run --only DEPLOYAPP
+    ```
+
+---
+
+# `grace run` vs. `grace submit`
+
+- `grace run` executes the workflow **synchronously** in the foreground. Your terminal is attached to the process, and you see live updates. The command waits for the entire workflow to finish.
+- [`grace submit`](/docs/cli-reference/submit) executes the workflow **asynchronously** by launching a detached background Grace process. The `submit` command returns immediately, allowing you to continue working. You would then check logs or a status command to monitor progress.
+
+Choose `grace run` for interactive sessions, development, and when you need to see immediate results or debug issues. Choose `grace submit` for longer-running workflows or for integration into automated systems where you don't want to tie up a terminal session.

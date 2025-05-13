@@ -1,5 +1,79 @@
 ---
 title: src/
+description: Understand the purpose of the src/ directory in a Grace workflow.
 ---
 
-placeholder
+In a Grace workspace, the `src/` directory is the conventional location for storing your application source code and related artifacts that you intend for Grace to manage and potentially upload to the mainframe.
+
+An example structure:
+
+```sh
+your-workflow-name/
+├── .grace/
+│ └── ...
+├── src/ # <-- Your application source files
+│ ├── myprogram.cbl
+│ ├── anotherprog.cpy
+│ ├── localscript.sh
+│ └── localparams.txt # (if used by a local shell script, for instance)
+└── grace.yml
+```
+
+---
+
+# Purpose
+
+The primary purpose of the `src/` directory is to hold files that are referenced in your `grace.yml` job definitions using the `src://` virtual path prefix.
+
+- **Mainframe source code:** This typically includes COBOL programs, PL/I programs, Assembler source, copybooks, includes, BMS maps, MFS screens, etc. When referenced by a `compile` job or similar, Grace will upload these to the z/OS dataset specified in your `datasets.src` configuration (or a job-level override).
+- **Scripts for `shell` jobs:** If a `shell` job type uses `with.script: src://myscript.sh`, Grace will look for `myscript.sh` in the `src/` directory.
+- **Other local files:** You can also organize other local files here that might be used as inputs by `shell` job steps or other local processing, although no strict rule enforces this beyond convention.
+
+---
+
+# How Grace uses `src://`
+
+When a job input in your `grace.yml` specifies a path like `path: src://myprogram.cbl`:
+
+1.  **Local Path Resolution:** Grace constructs a local file path by looking for `myprogram.cbl` inside the `src/` directory, relative to the location of your `grace.yml` file. So, it would look for `your-workflow-name/src/myprogram.cbl`.
+2.  **Upload to Mainframe (for z/OS job types):** During the `grace deck` command (unless `--no-upload` is specified), if this `src://` path is an input to a z/OS job type (like `compile`), Grace will:
+    - Derive a PDS member name from the filename (e.g., `myprogram.cbl` becomes `MYPROGRAM`).
+    - Upload the local file `src/myprogram.cbl` to the PDS member `datasets.src(MYPROGRAM)` on your z/OS system.
+3.  **JCL Generation:** The generated JCL for the job will then reference this uploaded member (e.g., `//SYSIN DD DSN=YOUR.HLQ.SRC(MYPROGRAM),DISP=SHR`).
+
+If a `shell` job uses `with.script: src://myscript.sh`, Grace will simply use the local path `src/myscript.sh` to execute the script.
+
+---
+
+## Example `grace.yml` usage
+
+```yaml
+# In your grace.yml
+
+datasets:
+  src: MYUSER.PROJECT.SOURCE # Target PDS on z/OS for src:// uploads
+
+jobs:
+  - name: COMPILEPGM
+    type: compile
+    inputs:
+      - name: SYSIN # Standard DDName for compiler input
+        path: src://mycobol.cbl
+        # Grace looks for ./src/mycobol.cbl and uploads it to MYUSER.PROJECT.SOURCE(MYCOBOL)
+    outputs:
+      - name: SYSLIN
+        path: zos-temp://myprog.obj
+
+  - name: RUNSCRIPT
+    type: shell
+    with:
+      script: src://helpers/setup.sh # Grace looks for ./src/helpers/setup.sh locally
+```
+
+---
+
+# Best practices
+
+- Keep your application source code directly related to the workflow within the `src/` directory.
+- If you have common copybooks or includes shared across many projects, consider if they should be managed centrally on the mainframe and referenced via `zos://COMMON.COPYLIB(MYCOPY)` in your grace.yml inputs, rather than duplicating them in every Grace project's `src/` folder. However, for project-specific, version-controlled source, `src://` is ideal.
+- Ensure filenames within `src/` (especially those destined for PDS members like COBOL programs) can be translated into valid PDS member names (typically uppercase, 1-8 characters, no problematic special characters beyond what your site allows). Grace will attempt to convert `myprogram.cbl` to `MYPROGRAM`.

@@ -1,5 +1,169 @@
 ---
 title: logs/
+description: Understanding the .grace/logs/ directory used for storing workflow execution logs and summaries.
 ---
 
-placeholder
+The `.grace/logs/` directory is an operational subdirectory automatically created and managed by Grace within your workflow workspace. It serves as the central repository for all logging information and execution summaries generated when you run a workflow using [`grace run`](/docs/cli-reference/run) or [`grace submit`](/docs/cli-reference/submit).
+
+Each workflow execution creates its own unique, timestamped subdirectory within `.grace/logs/`.
+
+```sh
+your-workflow-name/
+├── .grace/
+│   ├── deck/
+│   │   └── ...
+│   └── logs/ # <-- Workflow execution logs and summaries
+│       ├── 20231027T100000_run_workflow-id-1/
+│       │   ├── JOB01234_CMPHELLO.json
+│       │   ├── JOB01235_LNKHELLO.json
+│       │   ├── .local-staging/  # (if shell jobs used it)
+│       │   ├── summary.json
+│       │   └── workflow.log
+│       └── 20231027T153000_submit_workflow-id-2/
+│           ├── JOB00101_BATCHJOB.json
+│           ├── SKIPPED_REPORTJOB_153005.json
+│           ├── .local-staging/
+│           ├── summary.json
+│           └── workflow.log
+├── src/
+│   └── ...
+└── grace.yml
+```
+
+This directory is located at `.grace/logs/` relative to your `grace.yml` file.
+
+# Purpose and contents
+
+When a workflow is executed, Grace generates several types of files within a unique run-specific subdirectory:
+
+## 1. Run-specific log directory
+
+A new directory is created for each invocation of `grace run` or `grace submit`. The naming convention for this directory typically includes:
+
+- A timestamp in `YYYYMMDDTHHMMSS` format.
+- The command used (`run` or `submit`).
+- The unique Workflow ID (UUID) assigned to that specific execution.
+- Example directory name: `20231027T143000_submit_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+
+## 2. Individual job execution records (`JOBID_JOBNAME.json`)
+
+For each job that is attempted (including those that are skipped due to upstream failures), Grace creates a detailed JSON log file.
+
+- **Naming:** JES_JOBID_JOBNAME.json (e.g., JOB01234_CMPHELLO.json).
+
+  - For jobs that fail before a JES Job ID is assigned (e.g., submission failure), or for skipped jobs, the `JES_JOBID` part might be a placeholder like `SUBMIT_FAILED` or `SKIPPED_JOBNAME_timestamp`.
+  - For shell jobs, a Grace-generated ID like `shell-xxxxxxxx` is used.
+
+- **Content:** This file contains a comprehensive record of the job's execution, including:
+  - `job_name`, `job_id`, `type`, `workflow_id`.
+  - `grace_cmd`, `zowe_profile`, `hlq`, `initiator` details.
+  - Execution timings: `submit_time`, `finish_time`, `duration_ms`.
+  - For z/OS jobs: Detailed Zowe responses for job submission (`submit_response`) and final status (`final_response`), including status codes, return codes, and any error messages from Zowe.
+  - For `shell` jobs: Exit codes, `stdout`, and `stderr` from the script/command execution are often captured within the `final_response` structure.
+
+An example snippet from a z/OS job's JSON log:
+
+```json
+{
+  "job_name": "CMPHELLO",
+  "job_id": "JOB01234",
+  "type": "compile",
+  "workflow_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "submit_time": "2023-10-27T10:00:05Z",
+  "finish_time": "2023-10-27T10:00:15Z",
+  "duration_ms": 10000,
+  "submit_response": {
+    "success": true,
+    "data": {
+      "jobid": "JOB01234",
+      "jobname": "CMPHELLO",
+      "status": "INPUT"
+      // ... other zowe fields
+    }
+  },
+  "final_response": {
+    "success": true,
+    "data": {
+      "jobid": "JOB01234",
+      "jobname": "CMPHELLO",
+      "status": "OUTPUT",
+      "retcode": "CC 0000"
+      // ... other zowe fields
+    }
+  }
+}
+```
+
+## 3. Workflow summary (`summary.json`)
+
+At the end of every workflow execution (whether it succeeds, fails, or is partially completed), Grace generates a summary.json file in the root of the run-specific log directory.
+
+- **Content:** This file provides a high-level overview of the entire workflow run, including:
+  - `workflow_id`, `workflow_start_time`, `grace_cmd` used.
+  - `zowe_profile`, `hlq`, `initiator` details.
+  - An array of jobs, where each entry is a concise summary for a job (name, job_id, type, final status, return code, timings, relative path to its detailed JSON log).
+  - `overall_status` of the workflow (e.g., "Success", "Failed", "Partial", "Skipped").
+  - `total_duration_ms` for the workflow.
+  - Counts for `jobs_succeeded` and `jobs_failed`.
+  - Details of the `first_failure` if any job failed.
+
+An example snippet from `summary.json`:
+
+```json
+{
+  "workflow_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "workflow_start_time": "2023-10-27T10:00:00Z",
+  "grace_cmd": "run",
+  "overall_status": "Success",
+  "jobs": [
+    {
+      "job_name": "CMPHELLO",
+      "job_id": "JOB01234",
+      "type": "compile",
+      "status": "OUTPUT",
+      "return_code": "CC 0000",
+      "log_file": "20231027T100000_run_workflow-id-1/JOB01234_CMPHELLO.json"
+    }
+    // ... other jobs
+  ]
+  // ... other summary fields
+}
+```
+
+## 4. Workflow log (`workflow.log`)
+
+When a workflow is initiated using `grace submit` or `grace run`, Grace writes its main orchestration log to a `workflow.log` file within the run-specific log directory. The contents are identical to a `grace run --verbose` invocation, and hold logs of all levels for detailed traceability.
+
+- **Content:** This file contains detailed, timestamped log entries (at DEBUG level by default) covering the entire lifecycle of the background orchestration:
+
+  - Initialization messages.
+  - Configuration loading and validation.
+  - Graph building.
+  - Executor state changes (jobs moving from PENDING to READY to DISPATCHING, etc.).
+  - Job handler invocations (Prepare, Execute, Cleanup steps for each job).
+  - Zowe CLI command invocations and responses (if verbose logging is captured from Zowe calls).
+  - Error messages and stack traces if issues occur during orchestration.
+  - Final summary generation messages.
+
+- **Purpose:** This is the primary log for diagnosing issues with workflows run via grace submit, as there is no direct terminal output from the background process.
+
+## 5. Local staging directory (`.local-staging/`)
+
+If your workflow includes `shell` jobs that transfer files to or from the local machine (e.g., downloading a z/OS dataset to be processed by a script, or uploading a script's output), Grace may use a `.local-staging/` subdirectory within the run-specific log directory for these temporary local files.
+
+> The lifecycle of files in this directory is managed by the respective shell job handlers and Grace's temporary file management.
+
+---
+
+# Version control (`.gitignore`)
+
+The entire `.grace/logs/` directory and its contents are generated artifacts specific to each workflow run. They should almost always be included in your project's `.gitignore` file to prevent them from being committed to version control.
+
+```sh
+# Example .gitignore entry
+.grace/logs/*
+```
+
+---
+
+The `.grace/logs/` directory provides essential traceability and diagnostic information for your Grace workflow executions, helping you understand what happened, when, and why.

@@ -1,5 +1,74 @@
 ---
 title: grace.yml
+description: A high-level overview of the grace.yml file structure.
 ---
 
-placeholder
+The `grace.yml` file is the heart of your Grace workflow. It's a YAML file where you declaratively define all aspects of your automation, from global configurations to individual job steps and their relationships. Grace parses this file to understand and execute your desired workflow.
+
+> For a complete and detailed reference of all available fields, their options, and comprehensive explanations, please refer to the main [YAML Specification](/docs/yaml-specification) section. This page provides only a brief overview of the primary sections.
+
+---
+
+# Top-Level Structure
+
+A `grace.yml` file is organized into three main top-level keys:
+
+```yaml
+config:
+# Global workflow settings.
+
+# ...
+
+datasets:
+# Default z/OS dataset names for JCL, source, and load libraries.
+
+# ...
+
+jobs:
+# An array defining each step (job) in your workflow.
+
+# ...
+```
+
+### 1. `config`
+
+This section contains global configurations that apply to the entire workflow execution.
+
+- **`profile`**: Specifies the Zowe CLI profile for z/OS connectivity.
+- **`concurrency`**: (Optional) Limits how many jobs can run at the same time.
+- **`defaults`**: (Optional) Sets default parameters for common tools like compilers and linkers.
+  - **`compiler`**: Default settings for compilation steps.
+  - **`linker`**: Default settings for link-edit steps.
+- **`cleanup`**: (Optional) Defines rules for cleaning up temporary datasets after workflow completion.
+
+> [YAML Specification - Config](/docs/yaml-spec/config)
+
+### 2. `datasets`
+
+This section defines the default z/OS Partitioned Data Sets (PDS) that Grace will use.
+
+- **`jcl`**: The PDS for storing Job Control Language (JCL) members.
+- **`src`**: The PDS for storing uploaded source code (e.g., COBOL programs).
+- **`loadlib`**: The PDS for storing compiled and linked executable load modules.
+
+> [YAML Specification - Datasets](/docs/yaml-spec/datasets)
+
+### 3. `jobs`
+
+This is an array where each item defines a single job or step in your workflow.
+
+- **`name`**: A unique identifier for the job, used for JCL member naming and dependencies.
+- **`type`**: The kind of operation the job performs (e.g., `compile`, `execute`, `shell`).
+- **`jcl`**: (Optional, for z/OS types) Specifies the source of JCL (Grace default, local file/template, or existing mainframe member).
+- **`program`**: (For z/OS types) The program to execute or the output load module name.
+- **`inputs`**: (Optional) A list of data inputs for the job, using virtual paths.
+- **`outputs`**: (Optional) A list of data outputs produced by the job, using virtual paths.
+- **`depends_on`**: (Optional) A list of other job names that must complete first.
+- **`overrides`**: (Optional) Job-specific overrides for `compiler` or `linker` defaults.
+- **`with`**: (For specific types like `shell`) Type-specific parameters for the job.
+
+> [YAML Specification - Jobs](/docs/yaml-spec/jobs)
+
+---
+
+By defining these sections in `grace.yml`, you create a version-controllable, readable, and automated definition of your mainframe and hybrid workflows.

@@ -2,6 +2,19 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
+:root {
+  --font-ibm-plex-sans: '';
+  --font-ibm-plex-mono: '';
+}
+
+html {
+  font-family: var(--font-ibm-plex-sans), system-ui, sans-serif;
+}
+
+code, pre, kbd {
+  font-family: var(--font-ibm-plex-mono), monospace;
+}
+
 /* Reset blockquote styling */
 .prose blockquote {
   font-style: normal !important;

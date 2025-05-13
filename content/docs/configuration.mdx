@@ -124,9 +124,7 @@ zowe config set "profiles.myzos.properties.user" "[your_username]" --secure
 zowe config set "profiles.myzos.properties.password" "[your_password]" --secure --user-config
 ```
 
----
-
-# Test your Zowe profile
+## Test your Zowe profile
 
 After creating a profile, test its connection to z/OSMF:
 
@@ -168,7 +166,7 @@ When Grace runs, it effectively invokes Zowe CLI commands in the background, and
 
 ---
 
-# Important Considerations:
+# Important considerations:
 
 - **Security**: Be mindful of how you store credentials for your Zowe profiles. Using the Zowe secure credential store is recommended over plain text passwords in configuration files.
 
@@ -186,13 +184,14 @@ With Zowe CLI and your Grace `config.profile` correctly set up, you're ready to 
 
 <Cards>
   <Card href="/docs/tutorials" title="Tutorials">
-    Learn how to get your first workflows running using Grace
+    Learn how to get your first workflows running using Grace.
   </Card>
-  <Card href="/docs/yaml-specification" title="YAML Spec">
-    Explore grace.yml and get started writing worfklow orchestration
+  <Card href="/docs/yaml-spec" title="YAML Spec">
+    Explore `grace.yml` and familiarize yourself with the workflow orchestration
+    syntax.
   </Card>
   <Card href="/docs/cli-reference" title="CLI Reference">
     Learn the Grace CLI for scaffolding, validating, and running workflows from
-    the command line
+    the command line.
   </Card>
 </Cards>

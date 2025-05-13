@@ -25,15 +25,13 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
-                <Link href="/docs/tutorials">
-                  <Button className="h-11 px-8 gap-1.5 group">
-                    Get Started
+                <Link href="/docs">
+                  <Button variant="outline" className="h-11 px-8 gap-1.5 group">
+                    Get started
                   </Button>
                 </Link>
-                <Link href="/docs">
-                  <Button variant="outline" className="h-11 px-8">
-                    Read the Docs
-                  </Button>
+                <Link href="/docs/installation">
+                  <Button className="h-11 px-8">Download</Button>
                 </Link>
               </div>
             </div>
