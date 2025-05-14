@@ -30,7 +30,7 @@ export default function HomePage() {
                   </Button>
                 </Link>
                 <Link href="/docs/installation">
-                  <Button className="h-11 px-8">Download</Button>
+                  <Button className="h-11 px-8">Installation</Button>
                 </Link>
               </div>
             </div>
