@@ -14,30 +14,39 @@ jobs:
     program:
       MYPROG # Optional metadata; not directly used to name the PGM= for compiler
       # but can be useful if subsequent link-edit implicitly uses it.
-    jcl: file://custom_compile.jcl.tmpl
+    jcl: file://custom_compile.jcl.tmpl # Optional: Use a custom JCL template
+
     overrides:
       compiler:
         parms: "NODECK,OBJECT,MAP,XREF" # Override default compiler parameters
         steplib: "USER.COBOL.V6R3.LOADLIB" # Override default compiler STEPLIB
+
     inputs:
       - name: SYSIN
         path: src://myprog.cbl # Primary source code
+
       - name: COPYLIB
         path: zos://COMMON.COPYLIB.PDS
         disp: SHR
+
     outputs:
       - name: SYSLIN # Standard DDName for object deck output
         path: zos-temp://myprog.obj
+
       - name: SYSPRINT
         path: zos-temp://cmpprint.txt # Capture compiler listing
         keep: true # Keep this temporary dataset for review
 ```
 
+While `compile` jobs use [common job fields](/docs/yaml-spec/jobs) like `name`, `depends_on`, etc. and [z/OS specific fields](/docs/yaml-spec/jobs/zos-specifics) like `jcl`, `program`, and `overrides`, the following are particularly relevant for `type: compile`.
+
 ---
 
-While `compile` jobs use [common job fields](/docs/yaml-spec/jobs) like `name`, `depends_on`, etc. and [z/OS specific fields](#) like `jcl`, `program`, and `overrides`, the following are particularly relevant or have specific implications for `type: compile`.
-
 ## `type`
+
+```yaml
+type: compile
+```
 
 - **Value:** `compile` (Required)
 - **Description:** Identifies this job as a compilation task. Grace will use its internal `ZosCompileHandler` to manage its execution.
@@ -45,6 +54,10 @@ While `compile` jobs use [common job fields](/docs/yaml-spec/jobs) like `name`, 
 ---
 
 ## `program` (Optional metadata)
+
+```yaml
+program: MYPROG
+```
 
 - **Type:** `String`
 - **Description:** For a `compile` job, the `program` field is primarily metadata. The actual compiler program (e.g. `IGYCRCTL`) is determined by [`config.defaults.compiler.pgm`](/docs/yaml-spec/config#defaults) or [`job.overrides.compiler.pgm`](/docs/yaml-spec/jobs#overrides).
@@ -55,10 +68,14 @@ While `compile` jobs use [common job fields](/docs/yaml-spec/jobs) like `name`, 
 
 ## `jcl` (Optional)
 
+```yaml
+jcl: file://custom_compile.jcl[.tmpl]
+```
+
 - **Type:** `String`
 - **Description:** Specifies the source of the JCL for this compile job.
   - **Omitted:** Grace uses its internal default `compile.jcl.tmpl` template.
-  - `file://path/to/your_compile.jcl.tmpl`: Uses your local JCL file (static or templated).
+  - `file://path/to/your_compile.jcl[.tmpl]`: Uses your local JCL file (static or [templated](/docs/jcl-templates)).
   - `zos://MY.PDS.JCL(COMPILEJ)`: Uses an existing JCL member on the mainframe.
 
 > See [z/OS Job Specifics](/docs/yaml-spec/jobs/zos-specifics) and [JCL Templates](/docs/jcl-templates) for more details.
@@ -81,13 +98,24 @@ overrides:
 
 ## `inputs`
 
+```yaml
+inputs:
+  - name: SYSIN
+    path: src://myprog.cbl # Primary source code
+
+  # Optional example COPYLIB input
+  - name: COPYLIB
+    path: zos://COMMON.COPYLIB.PDS
+    disp: SHR
+```
+
 - **Description:** Defines the inputs to the compiler.
 - **Common `name` (DDName) values for compilers:**
   - `SYSIN` _(Standard)_ : The primary source code file to be compiled.
     - e.g. `path: src://myprog.cbl`
   - `COPYLIB` / `SYSLIB` / **custom DDs for copybooks**: To specify PDS(E) libraries containing copybooks or include members.
     - e.g. `path: zos://SHARED.COPYLIB.PDS`
-    - e.g. `path: src://copybook.cpy` (if Grace should upload `src/projectcopy.cpy` to `datasets.src(PROJECTCOPY)` which is then included in a [concatenated DD](/docs/jcl-templates#concatenatedDD) like `SYSLIB` in the JCL template)
+    - e.g. `path: src://copybook.cpy` (if Grace should upload `src/projectcopy.cpy` to `datasets.src(PROJECTCOPY)` which is then included in a [concatenated DD](/docs/jcl-templates#concatenatedDD) like `SYSLIB` in the [JCL template](/docs/jcl-templates))
       - Note: Your JCL template must be designed to handle such concatenated DDs if multiple `src://` copybooks are uploaded to the same `datasets.src`.
 
 > See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths) for details on `path` prefixes.
@@ -95,6 +123,17 @@ overrides:
 ---
 
 ## `outputs`
+
+```yaml
+outputs:
+  - name: SYSLIN # Standard DDName for object deck output
+    path: zos-temp://myprog.obj
+
+  # Optional example for capturing compiler listing
+  - name: SYSPRINT
+    path: zos-temp://cmpprint.txt
+    keep: true
+```
 
 - **Description:** Defines the outputs produced by the compiler.
 - **Common `name` (DDName) values for compilers:**

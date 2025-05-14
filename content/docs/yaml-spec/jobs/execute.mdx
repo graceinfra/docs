@@ -1,0 +1,165 @@
+---
+title: Execute
+description: Defining an 'execute' job module in your grace.yml to run programs or batch jobs on z/OS.
+---
+
+The `execute` job module is used to run a pre-compiled and linked executable program (load module) or a batch job on z/OS. This is typically the final step in a compile-link-execute sequence or a standalone step to run existing batch applications.
+
+Grace uses settings from the global [`config.defaults.linker`](/docs/yaml-spec/config#defaults) for `STEPLIB` context if it's generating JCL, although `execute` jobs don't directly use linker-specific overrides. The primary program execution context is defined by the `program` field and the [`datasets.loadlib`](/docs/yaml-spec/datasets#loadlib).
+
+```yaml
+jobs:
+  # (Assuming a preceding linkedit job named LNKMYPGM that created MYPROG in datasets.loadlib)
+
+  - name: RUNMYPGM
+    type: execute
+    program: MYPROG # Name of the program to execute from datasets.loadlib
+    depends_on: [LNKMYPGM]
+    jcl: file://custom_execute.jcl.tmpl # Optional: Use a custom JCL template
+
+    inputs:
+      - name: SYSIN # Input control cards or data for MYPROG
+        path: src://myrun.cards
+
+      - name: CUSTFILE
+        path: zos://PROD.MASTER.DATA(CURRENT)
+        disp: SHR
+
+    outputs:
+      - name: SYSPRINT
+        path: zos-temp://run_report.txt
+        dcb: "RECFM=FBA,LRECL=133"
+
+      - name: DATAOUT
+        path: zos://ARCHIVE.DAILY.OUTPUT(+1) # GDG example
+        disp: "(NEW,CATLG,DELETE)"
+        space: "(CYL,(10,2),RLSE)"
+```
+
+While `execute` jobs use [common job fields](/docs/yaml-spec/jobs) and [z/OS specific fields](/docs/yaml-spec/jobs/zos-specifics), the following are particularly relevant for `type: execute`.
+
+---
+
+## `type`
+
+```yaml
+type: execute
+```
+
+- **Value:** `execute` (Required)
+- **Description:** Identifies this job as a program execution task. Grace will use its internal `ZosExecuteHandler` to manage its execution.
+
+---
+
+## `program`
+
+```yaml
+program: MYPROG
+```
+
+- **Type:** `String`
+- **Required:** Yes
+- **Description:** Specifies the **name of the executable program (load module)** to run.
+  - This name must adhere to [PDS member naming conventions](https://www.ibm.com/docs/en/zos/3.1.0?topic=conventions-data-set-naming-rules).
+  - Grace's default JCL template for `execute` jobs will look for this program in the `STEPLIB`, which by default points to the `datasets.loadlib` defined [globally](/docs/yaml-spec/datasets#loadlib) or via a job-level [override](/docs/yaml-spec/jobs#overrides).
+  - This value is also available as `{{ .ProgramName }}` in JCL templates for the `PGM=` parameter of the `EXEC` statement.
+
+---
+
+## `jcl` (Optional)
+
+```yaml
+jcl: zos://PROD.COMMON.JCL(STDEXEC)
+```
+
+- **Type:** `String`
+- **Description:** Specifies the source of the JCL for this execute job.
+  - **Omitted:** Grace uses its internal default `execute.jcl.tmpl` template.
+  - `file://path/to/your_exec.jcl[.tmpl]`: Uses your local JCL file (static or [templated](/docs/jcl-templates)).
+  - `zos://MY.PDS.JCL(RUNJCL)`: Uses an existing JCL member on the mainframe.
+
+> See [z/OS Job Specifics](/docs/yaml-spec/jobs/zos-specifics) and [JCL Templates](/docs/jcl-templates) for more details.
+
+---
+
+## `overrides` (Optional)
+
+- **Description:** While the `overrides` block exists, the `compiler` and `linker` sub-sections within it are not directly used by the `execute` job handler itself when it generates JCL **using its default template** (as it's not compiling or linking). **However**, if you provide a custom JCL template (`jcl: file://`) that _happens_ to use variables like `{{ .CompilerPgm }}` for some reason, those could still be resolved from defaults or overrides.
+
+> Generally, `overrides` are not a primary concern for `type: execute` jobs.
+
+---
+
+## `inputs`
+
+```yaml
+inputs:
+  - name: SYSIN
+    path: src://runtime.params
+
+  - name: TRANSREC
+    path: zos-temp://transformed.data # Output from a previous step
+    disp: OLD # This dataset must exist
+```
+
+- **Description:** Defines the data inputs required by the program being executed. These typically map to DD statements in the JCL.
+- **Common `name` (DDName) values:**
+  - `SYSIN`: Often used for runtime parameters, control cards, or inline data
+  - Application-specific DDNames (e.g. `CUSTMAST`, `TRANFILE`, `PARMLIB`)
+- **Path sources can be varied:**
+  - `src://` for local files uploaded by Grace
+  - `zos-temp://` for intermediate datasets from prior Grace jobs
+  - `zos://` for preexisting mainframe datasets
+
+> See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths) for details on `path` prefixes and defining input paramenters like `disp`.
+
+---
+
+## `outputs`
+
+```yaml
+outputs:
+  - name: SYSOUT
+    path: zos-temp://job_sysout.log
+    keep: true
+
+  - name: RPTFILE
+    path: zos://MONTHLY.SALES.REPORT(+1) # Writing to a GDG
+    disp: "(NEW,CATLG,DELETE)"
+    space: "(CYL,(50,10),RLSE)"
+    dcb: "RECFM=FB,LRECL=132,BLKSIZE=27998"
+```
+
+- **Description:** Defines the datasets that the executed program will create or write to. These map to output DD statements in the JCL.
+- **Common `name` (DDName) values:**
+  - `SYSOUT`, `SYSPRINT`: For standard job output listings or application reports.
+  - Application-specific DDNames (e.g. `NEWMAST`, `ERRFILE`, `SUMMRPT`).
+- **Output paths can be:**
+  - `zos-temp://` for Grace-managed temporary datasets
+  - `zos://` for persistent datasets
+  - `file://` if the workflow involves downloading the output later via a subsequent `shell` job.
+
+> See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths) for details on `path` prefixes and defining output paramenters like `disp`, `space`, `dcb`, and `keep`.
+
+---
+
+# JCL generation context
+
+When Grace generates JCL for an execute job (either using its internal template or a user-provided `jcl: file://` template), the following specific data is made available, in addition to common job data and resolved I/O:
+
+- `{{ .ProgramName }}`: The name of the program to be executed (from [`job.program`](#program))
+- `{{ .LoadLib }}`: The DSN of the load library where `ProgramName` is expected to reside (from [`datasets.loadlib`](/docs/yaml-spec/datasets#loadlib) or a job-level override). This is typically used for the `STEPLIB DD` in the JCL.
+
+> Refer to the [JCL Templating Guide](/docs/jcl-templates) for a full list of variables available in JCL templates.
+
+---
+
+# Behavior notes
+
+- **Program location:** The program specified in `job.program` must exist in the `STEPLIB` concatenation (typically the `datasets.loadlib` or system libraries like `LINKLST`/`LPA`). If Grace generates the JCL, it will include a `STEPLIB DD` pointing to the resolved load library. If you provide custom JCL, **you are responsible for ensuring the correct `STEPLIB` is defined**.
+- **Dependencies:** `execute` jobs often depend on `linkedit` jobs that create the program to be run, or other jobs that prepare input data. Ensure you include necessary dependencies in this job's [`depends_on`](/docs/yaml-spec/jobs#depends_on) field.
+- **Return codes:** The success or failure of an `execute` job is determined by the return code of the executed program. `CC 0000` is typically success. Grace monitors these return codes.
+
+---
+
+The `execute` job module is fundamental for running your compiled applications and existing batch processes as part of a Grace-managed workflow.

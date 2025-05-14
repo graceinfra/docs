@@ -6,3 +6,179 @@ description: Defining a 'linkedit' job module in your grace.yml to create execut
 The `linkedit` job module is used to invoke the linkage editor on z/OS. Its primary purpose is to process object decks (typically from a `compile` step) and other inputs (like control statements or other object modules/load modules) to produce an executable load module in a specified load library.
 
 Grace uses settings from the global [`config.defaults.linker`](/docs/yaml-spec/config#defaults) block, which can be optionally overridden at the job level using the [`overrides.linker`](/docs/yaml-spec/jobs#overrides) block within this job definition.
+
+```yaml
+jobs:
+  # (Assuming a preceding compile job named CMPMYPGM producing zos-temp://myprog.obj)
+
+  - name: LNKMYPGM
+    type: linkedit
+    program: MYPROG # Name of the output load module in datasets.loadlib
+    depends_on: [CMPMYPGM]
+    jcl: file://custom_linkedit.jcl.tmpl # Optional: Use a custom JCL template
+
+    overrides:
+      linker:
+        parms: "RENT,REUS,AMODE=31,RMODE=ANY" # Override default linker parameters
+
+    inputs:
+      - name: SYSLIN # Standard DDName for primary object input
+        path: zos-temp://myprog.obj # Output from CMPMYPGM
+
+      - name: OBJLIB
+        path: zos://COMMON.OBJLIB.PDS(SUBRTN) # Include another object module
+        disp: SHR
+
+      - name: SYSIN # Linker control statements (e.g., INCLUDE, NAME)
+        path: src://mylink.cards # Optional, if specific control cards are needed
+
+    outputs:
+      - name: SYSPRINT
+        path: zos-temp://linkedit.listing.txt
+        keep: true
+```
+
+While `linkedit` jobs use [common job fields](/docs/yaml-spec/jobs) and [z/OS specific fields](/docs/yaml-spec/jobs/zos-specifics), the following are particularly relevant for `type: linkedit`.
+
+---
+
+## `type`
+
+```yaml
+type: linkedit
+```
+
+- **Value:** `linkedit` (Required)
+- **Description:** Identifies this job as a linkage-editing task. Grace will use its internal `ZosLinkeditHandler` to manage its execution.
+
+---
+
+## `program`
+
+```yaml
+program: MYAPP01
+```
+
+- **Type:** `String`
+- **Description:** This is a crucial field for `linkedit` jobs. It specifies the **name of the output load module** that will be created in the target load library.
+  - This name must adhere to [PDS member naming conventions](https://www.ibm.com/docs/en/zos/3.1.0?topic=conventions-data-set-naming-rules).
+  - The target load library is detemined by `datasets.loadlib` ([globally](/docs/yaml-spec/datasets#loadlib) or job-level [override](/docs/yaml-spec/jobs#overrides)).
+  - This value is also available as `{{ .ProgramName }}` in JCL templates
+    - e.g. for `NAME {{ .ProgramName }}(R)` control statements or the<br></br> `SYSLMOD DD DSN={{ .LoadLib }}({{ .ProgramName }})`.
+
+---
+
+## `jcl` (Optional)
+
+```yaml
+jcl: file://custom_linkedit.jcl[.tmpl]
+```
+
+- **Type:** `String`
+- **Description:** Specifies the source of the JCL for this link-edit job.
+  - **Omitted:** Grace uses its internal default `linkedit.jcl.tmpl` template.
+  - `file://path/to/your_link.jcl[.tmpl]`: Uses your local JCL file (static or [templated](/docs/jcl-templates)).
+  - `zos://MY.PDS.JCL(LINKJCL)`: Uses an existing JCL member on the mainframe.
+
+> See [z/OS Job Specifics](/docs/yaml-spec/jobs/zos-specifics) and [JCL Templates](/docs/jcl-templates) for more details.
+
+---
+
+## `overrides.linker` (Optional)
+
+```yaml
+overrides:
+  linker:
+    parms: "MAP,NOXREF,LET"
+```
+
+- **Type:** `Object`
+- **Description:** Allows you to specify linkage editor `pgm`, `parms`, or `steplib` settings that override the global [`config.defaults.linker`](/docs/yaml-spec/config#defaults) for this job.
+
+> See [z/OS Job Specifics](/docs/yaml-spec/zos-specifics) for more details.
+
+---
+
+## `inputs`
+
+```yaml
+inputs:
+  - name: SYSLIN
+    path: zos-temp://myprog.obj # Output from a compile step
+
+  - name: OBJLIB
+    path: zos://COMMON.OBJLIB.PDS(SUBRTN) # Optionally include another object module
+    disp: SHR
+
+  # Optional linker control statements (e.g., INCLUDE, NAME)
+  # if specific control cards are needed
+  - name: SYSIN
+    path: src://mylink.cards
+```
+
+- **Description:** Defines the inputs to the linkage editor.
+- **Common `name` (DDName) values for link-edit:**
+  - `SYSLIN` _(Standard)_ : The primary input containing object code (from a compiler) and/or linkage editor control statements.
+    - e.g. `path: zos-temp://myprog.obj` (output from a `compile` job)
+  - `SYSIN` _(Standard, but often embedded in `SYSLIN or JCL`)_ : Used for additional linkage editor control statements if not provided via `SYSLIN`.
+    - e.g. `path: src://linkedit.control.txt`
+  - **Custom DDNames (e.g. `OBJLIB`, `MODLIB`)**: To include other object modules or load modules from existing libraries as part of the link-edit process. These would typically be referenced by `INCLUDE` statements within your `SYSLIN` or `SYSIN` control cards.
+    - e.g. `path: zos://COMMON.OBJLIB.PDS`
+    - e.g. `path: zos://PROD.LOADLIB(COMMONRTN)`
+
+> See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths) for details on `path` prefixes.
+
+---
+
+## `outputs`
+
+```yaml
+outputs:
+  # - name: SYSLMOD # This is implicitly datasets.loadlib(MYPROG)
+
+  - name: SYSPRINT # Optional example link-edit listing file emission
+    path: zos-temp://linkedit.listing.txt
+    keep: true
+```
+
+- **Description:** Defines the outputs produced by the linkage editor.
+- **Implicit output `SYSLMOD`**:
+  - The primary output of a `linkedit` job is the load module. Grace **implicitly** handles the `SYSLMOD DD` statement in its default `linkedit.jcl.tmpl` template.
+  - The DSN for `SYSLMOD` is constructed as `{{ .LoadLib }}({{ .ProgramName }})`, where `{{ .LoadLib }}` is the resolved load library (from [`datasets.loadlib`](/docs/yaml-spec/datasets#loadlib)) and `{{ .ProgramName }}` is from [`job.program`](#program).
+  - You typically **do not** need to explicitly define an output with `name: SYSLMOD` unless you want to direct it to a non-standard location or manage it as a `zos-temp://` path (which is unusual for the final load module).
+- **Common explicit `name` (DDName) values:**
+  - `SYSPRINT` _(Standard)_ : For the linkage editor listing, map, and diagnostic messages.
+    - e.g. `path: zos-temp://linkedit.map.txt`
+  - Other DDs for side-files if your linkage editor process creates them.
+
+> In essence, the `outputs` section of a `linkedit` job is not necessary unless you wish to direct it to a non-standard location outside your load library.
+
+> See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths) for details on `path` prefixes.
+
+---
+
+# JCL generation context
+
+When Grace generates JCL for a linkedit job (either using its internal template or a user-provided `jcl: file://` template), the following specific data related to linker settings is made available to the template, in addition to common job data:
+
+- `{{ .LinkerPgm }}`: The resolved linkage editor program name.
+- `{{ .LinkerParms }}`: The resolved linkage editor parameters.
+- `{{ .LinkerSteplib }}`: The resolved linkage editor `STEPLIB` DSN (empty string if none).
+- `{{ .ProgramName }}`: The name of the output load module (from [`job.program`](#program)).
+- `{{ .LoadLib }}`: The DSN of the target load library.
+
+These are derived from job.overrides.linker, config.defaults.linker, job.program, and [`datasets.loadlib`](/docs/yaml-spec/datasets#loadlib).
+
+> Refer to the [JCL Templating Guide](/docs/jcl-templates) for a full list of variables available in JCL templates.
+
+---
+
+# Behavior notes
+
+- **Dependencies:** `linkedit` jobs typically depend on one or more `compile` jobs that produce the necessary object modules (`SYSLIN` input). Ensure you include necessary dependencies in this job's [`depends_on`](/docs/yaml-spec/jobs#depends_on) field.
+- **Load module creation:** The successful completion of a `linkedit` job results in a new or updated load module in the specified [load library](/docs/yaml-spec/datasets#loadlib).
+- **Return codes:** A successful link-edit usually results in a return code of `0000`. Warnings (e.g. unresolved weak externals) might produce `0004`. Higher codes indicate errors.
+
+---
+
+The `linkedit` job module is essential for creating executable programs on z/OS within your Grace automated workflows.

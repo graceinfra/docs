@@ -14,14 +14,13 @@ export default function HomePage() {
             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_500px_at_50%_200px,rgba(255,255,255,0.1),transparent)] dark:bg-[radial-gradient(circle_500px_at_50%_200px,rgba(0,0,0,0.1),transparent)] -z-10" />
             <div className="space-y-8">
               <div className="relative space-y-4 backdrop-blur-sm">
-                <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none bg-clip-text text-transparent bg-gradient-to-b from-black to-neutral-600 dark:from-white dark:to-neutral-400 drop-shadow-sm">
-                  The cloud just made
-                  <br />a new friend
+                <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none bg-clip-text text-transparent bg-gradient-to-b from-black to-neutral-600 dark:from-neutral-200 dark:to-neutral-400 drop-shadow-sm lg:leading-tight">
+                  Cloud-native workflows <br /> for your not-so-native systems.
                 </h1>
                 <p className="mx-auto max-w-[700px] text-zinc-600 dark:text-zinc-300 md:text-xl leading-relaxed">
                   Turn your mainframe into just another backend. Grace makes it
-                  stupid simple to integrate z/OS with modern data pipelines and
-                  cloud workflows.
+                  easy to integrate z/OS with modern data pipelines and cloud
+                  workflows.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">

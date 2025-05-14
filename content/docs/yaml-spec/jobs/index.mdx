@@ -201,10 +201,11 @@ jobs:
 ```yaml
 config:
   defaults:
-    compiler:
+    compiler: # Global compiler defaults
       pgm: IGYCRCTL
       parms: "OBJECT,NODECK,LIB"
       steplib: "SYS1.COBOL.STANDARD.LOADLIB"
+
 jobs:
   - name: SPECIALCOMPILE
     type: compile

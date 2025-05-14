@@ -95,7 +95,7 @@ config:
 ```
 
 - **Type:** `Object`
-- **Description:** Controls the automatic deletion of temporary datasets created by Grace. Temporary datasets are those specified with `zos-temp://` or `local-temp://` virtual path prefixes in job `outputs` **not** marked with `keep: true`.
+- **Description:** Controls the automatic deletion of temporary datasets created by Grace. Temporary datasets are those specified with `zos-temp://` or `local-temp://` virtual path prefixes in job [`outputs`](/docs/yaml-spec/jobs#outputs) **not** marked with `keep: true`.
 - **Sub-fields**:
   - `on_success` _(Boolean)_ :
     - **Default:** `true`
