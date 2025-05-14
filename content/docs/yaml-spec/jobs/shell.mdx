@@ -1,0 +1,209 @@
+---
+title: Shell
+description: Defining a 'shell' job module in your grace.yml to execute local shell commands or scripts.
+---
+
+The `shell` job module allows you to execute arbitrary commands or scripts directly on the local machine where the Grace CLI is running. This is extremely useful for integrating non-mainframe tasks into your workflow, such as:
+
+- Pre-processing data before uploading to z/OS.
+- Post-processing data downloaded from z/OS.
+- Interacting with cloud services (e.g., AWS CLI, Azure CLI, `gcloud`).
+- Running custom scripts (Python, Node.js, Bash, etc.) as part of the pipeline.
+- Calling other CLI tools.
+
+Shell jobs are executed by the Grace instance itself, not submitted to z/OS.
+
+```yaml
+jobs:
+  - name: LOCALSETUP # Example: A shell job doing some local setup
+    type: shell
+    with:
+      inline: |
+        mkdir -p ./staging_area
+        echo "OK" > "$GRACE_OUTPUT_SETUPSTATUS"
+    outputs:
+      - name: SETUPSTATUS # $GRACE_OUTPUT_SETUPSTATUS
+        path: file://./staging_area/setup_status.txt
+
+  - name: PROCESSDATA # Example: A shell job processing a downloaded mainframe file
+    type: shell
+    depends_on: [SOME_MAINFRAME_JOB_THAT_PRODUCES_RAWDATA] # Assuming this input comes from z/OS
+    with:
+      script:
+        ./scripts/process_mainframe_data.sh
+        # Script uses $GRACE_INPUT_RAWDATA
+        # and writes to $GRACE_OUTPUT_PROCESSED
+    inputs:
+      - name: RAWDATA # $GRACE_INPUT_RAWDATA
+        path: zos-temp://data.from.zos
+    outputs:
+      - name: PROCESSED # $GRACE_OUTPUT_PROCESSED
+        path: local-temp://processed_data.csv
+      - name: TOUPLOAD # $GRACE_OUTPUT_TOUPLOAD
+        path: zos-temp://final.to.mainframe
+```
+
+An example shell script using Grace exposed input/output environment variables:
+
+```bash
+#!/bin/bash
+echo "Processing data from $GRACE_INPUT_RAWDATA"
+# ... some processing logic ...
+cat "$GRACE_INPUT_RAWDATA" | awk '{print $1 "," $2}' > "$GRACE_OUTPUT_PROCESSED"
+echo "Processed data written to $GRACE_OUTPUT_PROCESSED"
+
+echo "This part goes back to mainframe" > "$GRACE_OUTPUT_TOUPLOAD"
+echo "File prepared for upload at $GRACE_OUTPUT_TOUPLOAD"
+```
+
+> See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths), [`inputs`](#inputs), and [`outputs`](#outputs) for more information on how to use this.
+
+While `shell` jobs use [common job fields](/docs/yaml-spec/jobs) like `name`, `depends_on`, `inputs`, and `outputs` - the `type` and `with` block are central to its definition.
+
+---
+
+## `type`
+
+```yaml
+type: shell
+```
+
+- **Value:** `shell` (Required)
+- **Description:** Identifies this job as a local shell execution task. Grace will use its internal `ShellHandler` to manage execution.
+
+---
+
+## `with` (Required)
+
+The `with` block is required for `shell` jobs and specifies the command or script to be executed. It contains one of the following: `inline` or `script`.
+
+```yaml
+with:
+  # Choose one: inline or script
+  inline: 'echo "Hello from inline shell" > "$GRACE_OUTPUT_MYOUTPUT"'
+  # script: "./scripts/my_script.sh"
+  shell: "/bin/bash" # Optional: specify the shell to use
+```
+
+### `with.inline`
+
+- **Type:** `String` (can be a multi-line string using `|`)
+- **Description:** A string containing the shell commands to be executed directly. Multiple commands can be separated by newlines or semicolons as per standard shell syntax.
+- **Example (single line)**:
+  ```yaml
+  with:
+    inline: "mkdir -p ./output && touch ./output/result.txt"
+  ```
+- **Example (multi-line):**
+  ```yaml
+  with:
+    inline: |
+      echo "Starting process..."
+      sleep 2
+      echo "Process complete."
+  ```
+
+### `with.script`
+
+- **Type:** `String`
+- **Description:** The path to a script file to be executed.
+  - The path can be relative to `grace.yml` (e.g. `scripts/my_task.sh`)
+  - It can also use the `src://` prefix (e.g. `src://myscript.sh`) to refer to a script within the `src/` directory of your Grace workspace. If `src://` is used, Grace resolves it to the local path; it does **not** upload the script to run on the mainframe for a `shell` job.
+- **Example:**
+  ```yaml
+  with:
+    script: ./utils/deploy_to_cloud.py
+  ```
+
+### `with.shell` (Optional)
+
+- **Type:** `String`
+- **Default:** `sh` (or the system's default shell interpreter)
+- **Description:** Specifies the shell interpreter to use for executing `inline` commands or the `script` file.
+  - Common values: `sh`, `bash`, `zsh`, `python3`, `node`, etc.
+  - If executing a script file (e.g. `.py`, `.js`) that has a shebang (e.g. `#!/usr/bin/env python3`), the shebang will typically take precedence if `with.shell` is not specified or is a generic shell like `sh`. Providing `with.shell: python3` is recommended to make the intent explicit.
+- **Example:**
+  ```yaml
+  with:
+    inline: "print('Hello from Python')"
+    shell: python3
+  ```
+
+> **Important:** You must provide either [`with.inline`](#withinline) or [`with.script`](#withscript), but not both.
+
+---
+
+## `inputs`
+
+```yaml
+inputs:
+  - name: CONFIG_FILE # Exposed as $GRACE_INPUT_CONFIG_FILE
+    path: zos://PROD.PARMLIB(APPCONF)
+  - name: LOCAL_DATA # Exposed as $GRACE_INPUT_LOCAL_DATA
+    path: file://./input-data.csv
+```
+
+- **Description:** Defines data inputs for the shell job. For each input, Grace exposes an **environment variable** to your script/commands giving the local path to the data.
+- **Environment variable convention:** `GRACE_INPUT_<NAME_IN_UPPERCASE>`
+  - e.g. An input with `name: CONFIG_FILE` will be available as `$GRACE_INPUT_CONFIG_FILE`
+- **Behavior:**
+  - If the `path` is `zos://` or `zos-temp://`, Grace downloads the dataset/member to a temporary local staging file, and the environment variable points to this downloaded copy.
+  - If the `path` is `file://` or `src://`, the environment variable points directly to that resolved local file.
+- **Your script should use these environment variables to access input files:**
+  ```bash
+  # Inside your script:
+  echo "Using config from: $GRACE_INPUT_CONFIG_FILE"
+  ./src/process_data --input "$GRACE_INPUT_LOCAL_DATA
+  ```
+
+> See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths) for details on `path` prefixes and Grace exposed environment variables.
+
+---
+
+## `outputs`
+
+```yaml
+outputs:
+  - name: REPORT_DATA # Exposed as $GRACE_OUTPUT_REPORT_DATA
+    path: file://./reports/final_report.txt
+  - name: ZOS_UPLOAD_FILE # Exposed as $GRACE_OUTPUT_ZOS_UPLOAD_FILE
+    path: zos-temp://report.to.mainframe
+```
+
+- **Description:** Defines files your shell job is expected to produce. For each output, Grace provides an **environment variable** to your script/commands. This represents the local path where your script **MUST** write the output file.
+
+> Think of this like a contract by your shell job that indicates which resources will be produced for jobs downstream or will reside in the specified locations.
+
+- **Environment variable convention:** `GRACE_OUTPUT_<NAME_IN_UPPERCASE>`
+  - Example: An output with `name: REPORT_DATA` means your script should write to `$GRACE_OUTPUT_REPORT_DATA`.
+- **Behavior:**
+  - Grace determines the appropriate local path for the output based on its `path` definition (e.g., directly for `file://`, or a path in a local staging area for `local-temp://`, `zos://`, and `zos-temp://`).
+  - **Your script MUST create and write its output to the file path given by this environment variable.**
+  - If the output `path` is `zos://` or `zos-temp://`, Grace will automatically upload the local file (written by your script to `$GRACE_OUTPUT_...`) to the specified dataset after the script completes successfully.
+- **Example script usage:**
+  ```bash
+  # Inside your script:
+  generate_report > "$GRACE_OUTPUT_REPORT_DATA"
+  echo "Data for mainframe" > "$GRACE_OUTPUT_ZOS_UPLOAD_FILE"
+  ```
+
+> See [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths) for more on `path` prefixes and Grace exposed environment variables.
+
+---
+
+# Execution environment
+
+- **Working directory:** Shell commands/scripts execute with the `grace.yml` directory as their working directory.
+- **Environment variables:** Inherits Grace CLI's environment, plus the `GRACE_INPUT_*` and `GRACE_OUTPUT_*` variables.
+
+---
+
+# Behavior notes
+
+- **Local execution:** All operations occur on the machine where `grace` is run.
+- **Error handling:** Non-zero exit codes from scripts/commands cause the job to fail. Failures during input download or output upload also cause job failure.
+- **Stdout/stderr:** Captured and available in the job's JSON logfile under [`.grace/logs/`](/docs/directory-layout/grace-internal/logs).
+
+---
+
+The `shell` job module provides powerful flexibility to integrate local processing and interactions with external systems directly into your Grace workflows.
