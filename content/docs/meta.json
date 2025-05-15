@@ -5,7 +5,7 @@
     "tutorials/",
     "cli-reference/",
     "yaml-spec/",
-    "directory-layout/",
-    "jcl-templates"
+    "jcl-templates",
+    "directory-layout/"
   ]
 }
