@@ -194,55 +194,6 @@ jobs:
 
 > For a full explanation of virtual path prefixes and how data flows between jobs and platforms, see [Virtual Paths and Job I/O](/docs/yaml-spec/virtual-paths).
 
----
-
-### `overrides`
-
-```yaml
-config:
-  defaults:
-    compiler: # Global compiler defaults
-      pgm: IGYCRCTL
-      parms: "OBJECT,NODECK,LIB"
-      steplib: "SYS1.COBOL.STANDARD.LOADLIB"
-
-jobs:
-  - name: SPECIALCOMPILE
-    type: compile
-    overrides:
-      compiler:
-        parms: "ADV,RENT,OPTIMIZE(FULL),XREF(SHORT)" # Override parms
-        steplib: "MY.SPECIAL.COBOL.LOADLIB" # Override steplib
-    inputs:
-      - name: SYSIN
-        path: src://specialmod.cbl
-    # ...
-
-  - name: NORMALCOMPILE
-    type: compile # This job will use the global defaults
-    inputs:
-      - name: SYSIN
-        path: src://normalmod.cbl
-    # ...
-```
-
-- **Type:** `Object`
-- **Required:** No
-- **Applicable job types:** `compile`, `linkedit`.
-- **Description:** Allows you to override the global default settings for compiler or linker toolchains for this specific job. This is useful when a particular compilation or link-edit step requires different parameters, program names, or `STEPLIB`s than those defined in the global [config.defaults](/docs/yaml-spec/config#defaults) section.
-- **Sub-fields:**
-  - `compiler` _(Object)_ : Overrides for compiler settings. Any fields specified here will take precedence over [config.defaults.compiler](/docs/yaml-spec/config#defaults) for this job.
-    - `pgm` _(String, Optional)_ : The specific program name for the compiler for this job (e.g. `IGYCRCTL`).
-    - `parms` _(String, Optional)_ : Specific compiler parameters for this job.
-    - `steplib` _(String, Optional)_ : Specific `STEPLIB` dataset(s) for this compiler step.
-  - `linker` _(Object)_ : Overrides for linkage editor settings. Any fields specified here will take precedence over [config.defaults.linker](/docs/yaml-spec/config#defaults) for this job.
-    - `pgm` _(String, Optional)_ : The specific program name for the linkage editor for this job (e.g. `IEWL`).
-    - `parms` _(String, Optional)_ : Specific linkage editor parameters for this job.
-    - `steplib` _(String, Optional)_ : Specific STEPLIB dataset(s) for this linkage editor step.
-- **Behavior:**
-  - If a field (e.g. `parms`) is specified within [`job.overrides.compiler`](/docs/yaml-spec/jobs#overrides), it will be used.
-  - If it's not specified in `job.overrides.compiler`, Grace will then look at [`config.defaults.compiler`](/docs/yaml-spec/config#defaults).
-  - If it's also not in `config.defaults.compiler`, Grace may use an internal hardcoded default (e.g. for `PGM` names like `IGYCRCTL`), though this should avoided.
 
 ---
 

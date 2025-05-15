@@ -112,7 +112,7 @@ You have two way to include DD statements for your job's `inputs` and `outputs`:
    - **Structure:**
      - `{{ .Name }}` _(String)_ : The DDName (e.g. `SYSIN`, `CUSTFILE`).
      - `{{ .DSN }}` _(String)_ : The fully resolved physical DSN (e.g. `IBMUSER.PROJ.SRC(MYPROG)`, `IBMUSER.TEMP.H123AB.SYSLIN`).
-     - `{{ .DISP }}` _(String)_ : The resolved JCL disposition (e.g. `SHR`, `(NEW,CATLG,DELETE)`). This considers [`job.disp`](/docs/yaml-spec/jobs/zos-specifics#disp) for outputs, and is overridden by [`keep`](/docs/yaml-spec/virtual-paths#keep).
+     - `{{ .DISP }}` _(String)_ : The resolved JCL disposition (e.g. `SHR`, `(NEW,CATLG,DELETE)`). This considers [`job.disp`](/docs/yaml-spec/virtual-paths#disp) for outputs, and is overridden by [`keep`](/docs/yaml-spec/virtual-paths#keep).
      - `{{ .Space }}` _(String, `outputs` only)_ : The resolved JCL `SPACE` parameter (e.g. `(TRK,(5,2),RLSE)`).
      - `{{ .DCB }}` _(String, `outputs` only)_ : The resolved JCL `DCB` parameter (e.g. `RECFM=FB,LRECL=80`).
      - `{{ .IsOutput }}`_(Boolean)_ : `true` if this is from the `outputs` array, `false` if from `inputs`. (Useful if you process them in a combined loop, though ranging separately is common practice).
@@ -136,7 +136,7 @@ You have two way to include DD statements for your job's `inputs` and `outputs`:
 
 ---
 
-## Available template functions
+# Available template functions
 
 Grace makes a few utility functions available in JCL templates:
 

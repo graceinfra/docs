@@ -1,3 +1,179 @@
 ---
-title: z/OS Job Specifics
+title: Common z/OS Job Parameters
+description: Configuration fields specific to z/OS job modules grace.yml.
 ---
+
+When defining z/OS-specific job modules in Grace (such as `compile`, `linkedit`, and `execute`), several common configuration fields allow you to control how JCL is sourced, which programs are invoked, and how dataset and toolchain defaults are applied or overridden at the job level.
+
+This page details these common parameters. For fields applicable to _all_ job types (including `shell`), such as `name`, `type`, `depends_on`, `inputs`, and `outputs`, refer to [YAML Spec - Jobs](/docs/yaml-specification/jobs).
+
+For detailed behavior on how these parameters are used by specific z/OS job modules, see the individual module pages:
+
+<Cards>
+  <Card href="/docs/yaml-specification/jobs/compile" title="Compile">
+    Details how `jcl`, `program` (as metadata), `inputs` (for SYSIN, copybooks),
+    `outputs` (for SYSLIN), and `overrides.compiler` apply to compilation steps.
+  </Card>
+  <Card href="/docs/yaml-specification/jobs/linkedit" title="Linkedit">
+    Explains the use of `jcl`, the crucial `program` field (for output module
+    name), `inputs` (SYSLIN, object libraries), and `overrides.linker` in
+    creating load modules.
+  </Card>
+  <Card href="/docs/yaml-specification/jobs/execute" title="Execute">
+    Covers `jcl`, the `program` field (for the PGM to run), `inputs`, and
+    `outputs` for running batch jobs and programs, utilizing the resolved
+    STEPLIB.
+  </Card>
+</Cards>
+
+---
+
+# `jcl`
+
+```yaml
+jobs:
+  - name: MYJOB
+    type: compile
+    # Option 1: Omit for Grace default JCL
+    # jcl: (not specified)
+
+    # Option 2: Use a local JCL file or template
+    # jcl: file://./jcl/my_custom_compile.jcl.tmpl
+
+    # Option 3: Use an existing JCL member on z/OS
+    # jcl: zos://PROD.COMMON.JCL(STDCOMP)
+    # ...
+```
+
+- **Type:** `String`
+- **Required:** No
+- **Description:** Specifies the source of the Job Control Language (JCL) for this z/OS job. This field provides flexibility in how JCL is managed for each job step.
+- **Behavior based on value:**
+  - **Omitted/empty:** Grace uses its internal default JCL template tailored for the job's `type` (e.g., `compile.jcl.tmpl`). Data from `grace.yml` (like resolved DSNs for inputs/outputs, program names, toolchain parameters) is used to populate this template.
+  - **`file://path/to/your.jcl` or `file://path/to/your.jcl.tmpl`** : Grace uses the specified local file as the JCL source.
+    - If the file content includes Go template syntax (e.g., `{{ .ProgramName }}`) and the `--no-compile` flag is _not_ used with `grace deck`, Grace processes it as a template, injecting resolved values from the workflow context.
+    - If the file has no template syntax, or if `grace deck --no-compile` is used, the file's content is used as static JCL.
+    - In both `file://` cases, `grace deck` writes the (potentially rendered) JCL to `.grace/deck/JOBNAME.jcl` and uploads it to `datasets.jcl(JOBNAME)`.
+  - **`zos://PDS.NAME(MEMBER)`** : Grace uses this pre-existing JCL member directly from the specified z/OS PDS.
+    - `grace deck` will _not_ generate, process, or upload any JCL for this job's body.
+    - `grace run` or `grace submit` will instruct Zowe to submit this exact DSN member.
+- **Further reading:**
+  - [JCL Templating Guide](/docs/jcl-templates): For details on writing your own JCL templates.
+  - `grace deck` [CLI reference](/docs/cli-reference/deck): For information on `--no-compile` and upload behavior.
+
+---
+
+# `program`
+
+```yaml
+jobs:
+  - name: RUNBATCH
+    type: execute
+    program: MYAPP01 # Program to execute
+
+  - name: LINKPROG
+    type: linkedit
+    program: MYAPP01 # Output load module name
+```
+
+- **Type:** `String`
+- **Required:** Yes for `execute` and `linkedit` types. Optional (metadata) for `compile`.
+- **Description:** Specifies the primary program or load module name associated with the job.
+- **Interpretation by job type:**
+  - **For `type: execute`**: This is the name of the load module to be executed (becomes the `PGM=` value in the JCL `EXEC` statement if Grace generates the JCL). Grace's default JCL will typically include a `STEPLIB` pointing to the resolved `datasets.loadlib`.
+  - **For `type: linkedit`**: This is the name of the output load module that will be created in the resolved `datasets.loadlib`. It's used for the `SYSLMOD DD DSN={{.LoadLib}}({{.ProgramName}})` JCL statement and can be used in linker control cards (e.g., `NAME {{.ProgramName}}(R)`).
+  - **For `type: compile`**: This field is primarily for user metadata or to suggest a base name for a subsequent `linkedit` step. The actual compiler program (e.g., `IGYCRCTL`) is determined via `config.defaults.compiler.pgm` or `job.overrides.compiler.pgm`.
+- **Constraints:** Must adhere to [PDS member naming conventions](https://www.ibm.com/docs/en/zos/3.1.0?topic=conventions-data-set-naming-rules).
+- **Availability in JCL templates:** This value is available to JCL templates as `{{.ProgramName}}`.
+
+---
+
+# `datasets`
+
+```yaml
+# Global dataset definitions
+datasets:
+  jcl: "DEVL.PROJECT.JCL"
+  src: "DEVL.PROJECT.SOURCE"
+  loadlib: "DEVL.PROJECT.LOADLIB"
+
+jobs:
+  - name: JOB_A
+    type: compile
+    # This job uses global datasets definitions above
+
+  - name: JOB_B
+    type: compile
+    datasets: # JOB_B specific dataset overrides
+      src: "DEVL.SPECIAL.SOURCE" # Uses a different source PDS
+      loadlib: "DEVL.TEMP.LOAD" # (loadlib not generally used by compile, this is for illustration)
+    # For JCL, JOB_B will still use DEVL.PROJECT.JCL as it's not overridden here
+    # ...
+```
+
+- **Type:** `Object`
+- **Required:** No
+- **Description:** Allows a specific job to use different z/OS Partitioned Data Sets for its JCL, source files, or load library, overriding the global definitions in the top-level `datasets` block.
+- **Sub-fields:**
+  - `jcl` _(String, Optional)_ : Specifies a PDS for this job's JCL, overriding `datasets.jcl`.
+  - `src` _(String, Optional)_ : Specifies a PDS for this job's `src://` inputs, overriding `datasets.src`.
+  - `loadlib` _(String, Optional)_ : Specifies a load library for this job, overriding `datasets.loadlib`.
+- **Behavior:**
+  - If a job defines its own `datasets` block, any PDS specified within it will be used for that job instead of the global defaults.
+  - If a PDS type (e.g., `src`) is _not_ specified in the job-level `datasets` block, the global default for that type is used.
+  - This allows for fine-grained control, for instance, if one job needs to read source from a different library or output a load module to a specific test library.
+
+---
+
+# `overrides`
+
+```yaml
+config:
+  defaults:
+    compiler: # Global compiler defaults
+      pgm: IGYCRCTL
+      parms: "OBJECT,NODECK,LIB"
+      steplib: "SYS1.COBOL.STANDARD.LOADLIB"
+
+jobs:
+  - name: SPECIALCOMPILE
+    type: compile
+    overrides:
+      compiler:
+        parms: "ADV,RENT,OPTIMIZE(FULL),XREF(SHORT)" # Override parms
+        steplib: "MY.SPECIAL.COBOL.LOADLIB" # Override steplib
+    inputs:
+      - name: SYSIN
+        path: src://specialmod.cbl
+    # ...
+
+  - name: NORMALCOMPILE
+    type: compile # This job will use the global defaults
+    inputs:
+      - name: SYSIN
+        path: src://normalmod.cbl
+    # ...
+```
+
+- **Type:** `Object`
+- **Required:** No
+- **Applicable job types:** Primarily `compile`, `linkedit`.
+- **Description:** Allows you to override the global default settings for `compiler` or `linker` toolchains for this specific job. This is useful when a particular compilation or link-edit step requires different parameters, program names, or `STEPLIB`s than those defined in the global [`config.defaults`](/docs/yaml-specification/config#defaults) section.
+- **Sub-fields:**
+  - `compiler` _(Object, Optional)_ : Overrides for compiler settings. Any fields specified here will take precedence over [`config.defaults.compiler`](/docs/yaml-specification/config#defaults) for this job.
+    - `pgm` _(String, Optional)_ : The specific program name for the compiler for this job (e.g., `IGYCRCTL`).
+    - `parms` _(String, Optional)_ : Specific compiler parameters for this job.
+    - `steplib` _(String, Optional)_ : Specific `STEPLIB` dataset(s) for this compiler step.
+  - `linker` _(Object, Optional)_ : Overrides for linkage editor settings. Any fields specified here will take precedence over [`config.defaults.linker`](/docs/yaml-specification/config#defaults) for this job.
+    - `pgm` _(String, Optional)_ : The specific program name for the linkage editor for this job (e.g., `IEWL`).
+    - `parms` _(String, Optional)_ : Specific linkage editor parameters for this job.
+    - `steplib` _(String, Optional)_ : Specific STEPLIB dataset(s) for this linkage editor step.
+- **Behavior:**
+  - If a field (e.g., `parms`) is specified within [`job.overrides.compiler`](#overrides), it will be used for this job.
+  - If it's not specified in `job.overrides.compiler`, Grace will then use the value from [`config.defaults.compiler`](/docs/yaml-spec/config#defaults).
+  - If it's also not in `config.defaults.compiler`, Grace's internal resolvers use a hardcoded default (e.g., for PGM names like `IGYCRCTL`), though relying on explicit defaults in `grace.yml` is recommended.
+- **Availability in JCL templates:** The _resolved_ values (after considering overrides and defaults) for these toolchain parameters are exposed to [JCL templates](/docs/jcl-templates) (e.g., as `{{.CompilerPgm}}`, `{{.LinkerParms}}`).
+
+---
+
+These parameters provide the primary means of configuring the z/OS-specific aspects of your Grace jobs. By understanding their interplay with global defaults and JCL templating, you can create highly customized and efficient mainframe workflows.

@@ -28,7 +28,7 @@ This system allows you to define how data flows through your workflow in a decla
 
 # `inputs` and `outputs`
 
-As introduced in [Jobs](/docs/yaml-spec/jobs), most job definitions can include `inputs` and `outputs` arrays. These arrays define the "data contract" for each job.
+As introduced in [Jobs](/docs/yaml-spec/jobs), you can specify `inputs` and `outputs` arrays for jobs to consume or produce. These arrays define the "data contract" for each job.
 
 Each item within the `inputs` or `outputs` array is an object that describes a single piece of data. The two most important fields for each item are:
 
@@ -70,7 +70,99 @@ jobs:
     # ... other job fields
 ```
 
-While `name` and `path` are always present, additional parameters like `disp`, `dcb`, `space`, and `keep` can be specified for finer control of JCL generation or the lifecycle of temporary resources. For details on how these and other resolved values are exposed when writing custom JCL templates, see [JCL Templates](/docs/jcl-templates).
+---
+
+# Additional parameters
+
+While `name` and `path` are always present, additional parameters can be specified within an input or output item to provide finer control, particularly for how JCL DD statements are generated for z/OS datasets and how temporary resources are managed.
+
+These parameters are typically most relevant when the `path` refers to a `zos://` or `zos-temp://` resource, or when defining the characteristics of an output dataset to be created on z/OS.
+
+For details on how these and other resolved values are exposed when writing custom JCL templates, see the [JCL Templating Guide](/docs/jcl-templates).
+
+    ***
+
+## `disp`
+
+```yaml
+inputs:
+  - name: OLDMAST
+    path: zos://PROD.MASTER
+    disp: OLD # Ensure exclusive access
+
+outputs:
+  - name: NEWMAST
+    path: zos://PROD.NEWMASTER
+    disp: "(NEW,CATLG,KEEP)" # Create, catalog, and keep on normal/abnormal end
+```
+
+- **Type:** `String`
+- **Optional:** Yes
+- **Applies to:** `inputs` and `outputs` (for z/OS datasets)
+- **Description:** Specifies the JCL `DISP=` (disposition) subparameter for the DD statement. This controls the status of the dataset before and after the job step.
+- **Grace's default behavior:**
+
+  - For `inputs`: Defaults to `SHR` (e.g., `DISP=SHR`).
+  - For `outputs` using `zos-temp://` or new `zos://` datasets: Defaults to `(NEW,CATLG,DELETE)` (or `(NEW,CATLG,CATLG)` if `keep: true` is set for a `zos-temp://` output).
+  - For `outputs` using `zos://` pointing to an existing dataset you intend to modify: You might specify `MOD` (e.g., `DISP=MOD` or `DISP=(MOD,KEEP)`).
+
+  ***
+
+## `dcb`
+
+```yaml
+outputs:
+  - name: REPORTFILE
+    path: zos-temp://daily.report
+    dcb: "RECFM=FBA,LRECL=133,BLKSIZE=13300"
+```
+
+- **Type:** `String`
+- **Optional:** Yes
+- **Applies to:** `outputs` (primarily for z/OS datasets being created or written to)
+- **Description:** Specifies the JCL `DCB=` (Data Control Block) subparameters for the DD statement, defining the dataset's characteristics.
+- **Format:** A string containing comma-separated DCB attributes (e.g., `"RECFM=FB,LRECL=80,BLKSIZE=27920"`).
+- **Grace's default behavior:** For `zos-temp://` outputs, Grace uses a sensible default (e.g., `(RECFM=FB,LRECL=80)`) if not specified. For `zos://` outputs where a new dataset is being created, providing DCB attributes is often necessary.
+
+  ***
+
+## `space`
+
+```yaml
+outputs:
+  - name: BIGDATAOUT
+    path: zos-temp://large.extract
+    space: "(CYL,(100,50),RLSE)" # Allocate a larger temporary dataset
+```
+
+- **Type:** `String`
+- **Optional:** Yes
+- **Applies to:** `outputs` (primarily for z/OS datasets being created)
+- **Description:** Specifies the JCL `SPACE=` parameter for allocating space to a new dataset on z/OS.
+- **Format:** A string representing the JCL SPACE parameter (e.g., `"(TRK,(10,5),RLSE)"`, `"(CYL,(1,1))"`).
+- **Grace's default behavior:** For `zos-temp://` outputs, Grace uses a modest default space allocation (e.g., `(TRK,(5,5),RLSE)`) if not specified. For `zos://` outputs where a new dataset is being created, providing appropriate space parameters is crucial.
+
+  ***
+
+## `keep`
+
+```yaml
+outputs:
+  - name: DEBUG_OBJ
+    path: zos-temp://myprog.debug.obj
+    keep: true # Do not delete this object deck after the workflow
+```
+
+- **Type:** `Boolean`
+- **Optional:** Yes
+- **Applies to:** `outputs` using `zos-temp://` or `local-temp://` paths.
+- **Default:** `false`
+- **Description:** Controls whether Grace automatically cleans up (deletes) this temporary resource after the workflow execution completes.
+  - If `true`: Grace will not delete the temporary z/OS dataset or local file during its standard cleanup procedures. This is useful for debugging or if an intermediate "temporary" resource needs to be inspected or used outside of Grace after the workflow.
+  - If `false` (default): The temporary resource is subject to deletion based on the global `config.cleanup` settings (which default to deleting on workflow success).
+- **Effect on `DISP` for `zos-temp://`:**
+
+  When `keep: true` is set for a `zos-temp://` output, Grace will override the `DISP` parameter in the generated JCL to `(NEW,CATLG,CATLG)` to ensure the dataset is kept even if the step ABENDs (after successful creation and cataloging in the step). It is recommended to use **either** `disp` or `keep` fields, but not both.
 
 ---
 
