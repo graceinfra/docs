@@ -26,7 +26,7 @@ export default function HomePage() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
                 <Link href="/docs">
                   <Button variant="outline" className="h-11 px-8 gap-1.5 group">
-                    Get started
+                    Documentation
                   </Button>
                 </Link>
                 <Link href="/docs/installation">
