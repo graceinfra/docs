@@ -10,16 +10,16 @@ This page details these common parameters. For fields applicable to _all_ job ty
 For detailed behavior on how these parameters are used by specific z/OS job modules, see the individual module pages:
 
 <Cards>
-  <Card href="/docs/yaml-specification/jobs/compile" title="Compile">
+  <Card href="/docs/yaml-spec/jobs/compile" title="Compile">
     Details how `jcl`, `program` (as metadata), `inputs` (for SYSIN, copybooks),
     `outputs` (for SYSLIN), and `overrides.compiler` apply to compilation steps.
   </Card>
-  <Card href="/docs/yaml-specification/jobs/linkedit" title="Linkedit">
+  <Card href="/docs/yaml-spec/jobs/linkedit" title="Linkedit">
     Explains the use of `jcl`, the crucial `program` field (for output module
     name), `inputs` (SYSLIN, object libraries), and `overrides.linker` in
     creating load modules.
   </Card>
-  <Card href="/docs/yaml-specification/jobs/execute" title="Execute">
+  <Card href="/docs/yaml-spec/jobs/execute" title="Execute">
     Covers `jcl`, the `program` field (for the PGM to run), `inputs`, and
     `outputs` for running batch jobs and programs, utilizing the resolved
     STEPLIB.
@@ -158,13 +158,13 @@ jobs:
 - **Type:** `Object`
 - **Required:** No
 - **Applicable job types:** Primarily `compile`, `linkedit`.
-- **Description:** Allows you to override the global default settings for `compiler` or `linker` toolchains for this specific job. This is useful when a particular compilation or link-edit step requires different parameters, program names, or `STEPLIB`s than those defined in the global [`config.defaults`](/docs/yaml-specification/config#defaults) section.
+- **Description:** Allows you to override the global default settings for `compiler` or `linker` toolchains for this specific job. This is useful when a particular compilation or link-edit step requires different parameters, program names, or `STEPLIB`s than those defined in the global [`config.defaults`](/docs/yaml-spec/config#defaults) section.
 - **Sub-fields:**
-  - `compiler` _(Object, Optional)_ : Overrides for compiler settings. Any fields specified here will take precedence over [`config.defaults.compiler`](/docs/yaml-specification/config#defaults) for this job.
+  - `compiler` _(Object, Optional)_ : Overrides for compiler settings. Any fields specified here will take precedence over [`config.defaults.compiler`](/docs/yaml-spec/config#defaults) for this job.
     - `pgm` _(String, Optional)_ : The specific program name for the compiler for this job (e.g., `IGYCRCTL`).
     - `parms` _(String, Optional)_ : Specific compiler parameters for this job.
     - `steplib` _(String, Optional)_ : Specific `STEPLIB` dataset(s) for this compiler step.
-  - `linker` _(Object, Optional)_ : Overrides for linkage editor settings. Any fields specified here will take precedence over [`config.defaults.linker`](/docs/yaml-specification/config#defaults) for this job.
+  - `linker` _(Object, Optional)_ : Overrides for linkage editor settings. Any fields specified here will take precedence over [`config.defaults.linker`](/docs/yaml-spec/config#defaults) for this job.
     - `pgm` _(String, Optional)_ : The specific program name for the linkage editor for this job (e.g., `IEWL`).
     - `parms` _(String, Optional)_ : Specific linkage editor parameters for this job.
     - `steplib` _(String, Optional)_ : Specific STEPLIB dataset(s) for this linkage editor step.
