@@ -1,0 +1,102 @@
+---
+title: Virtual Paths & Job I/O
+---
+
+In Grace, workflows often involve multiple steps that need to pass data to each other.
+
+This data might:
+
+- Live on the mainframe as a dataset.
+- Reside on your local machine as a file.
+- Be accessible as a resource in the cloud.
+- Be a temporary artifact created by one job and consumed by another.
+
+To manage this complexity, Grace uses **virtual paths** within the `inputs` and `outputs` sections of your job definitions.
+
+A **virtual path** is a URI-like string (e.g., `src://mycode.cbl`, `zos-temp://report.txt`) that tells Grace about the _nature_ and _intended location or source_ of a piece of data. Grace then resolves these virtual paths to actual physical locations (like a z/OS dataset name or a local file path) at the appropriate time.
+
+This system allows you to define how data flows through your workflow in a declarative way, without having to manage file handoff and lifecycles manually. Grace uses these definitions to:
+
+- Wire data dependencies between jobs.
+- Generate appropriate JCL DD statements for mainframe jobs.
+- Manage the lifecycle of temporary data (creation and cleanup).
+- Facilitate data movement for jobs resources across platforms.
+
+> Use `inputs` to tell a job what data it needs. Use `outputs` to declare what data a job produces and expose it for downstream jobs to consume. Use **virtual paths** in the `path` field to **describe that data to Grace**.
+
+---
+
+# `inputs` and `outputs`
+
+As introduced in [Jobs](/docs/yaml-spec/jobs), most job definitions can include `inputs` and `outputs` arrays. These arrays define the "data contract" for each job.
+
+Each item within the `inputs` or `outputs` array is an object that describes a single piece of data. The two most important fields for each item are:
+
+## `name`
+
+_(String, required)_
+
+A logical name for this data item.
+
+- For z/OS job types (`compile`, `linkedit`, `execute`), this `name` directly translates to the **DDName** in the generated JCL (e.g. `SYSIN`, `SYSLIN`, `CUSTFILE`)
+- For `shell` jobs, this `name` is used to form the environment variables (e.g. `GRACE_INPUT_SYSIN`, `GRACE_OUTPUT_SYSLIN`) that provide local paths to the data for your script.
+
+## `path`
+
+_(String, required)_
+
+The **virtual path** that specifies the source (for inputs) or intended destination/identifier (for outputs) of the data. The prefix of this path (e.g. `src://`, `zos://`, `zos-temp://`) determines how Grace interprets and handles it.
+
+---
+
+**Example `inputs` and `outputs` structure:**
+
+```yaml
+jobs:
+  - name: MY_SAMPLE_JOB
+    type: compile # Or any other type
+
+    inputs:
+      - name: SYSIN # Logical name (becomes DDName or part of env var)
+        path: src://mycode.cbl # Virtual path to the input data
+        disp: SHR # Optional: JCL DISP for z/OS inputs
+
+    outputs:
+      - name: SYSLIN # Logical name
+        path: zos-temp://mycode.obj # Virtual path for the output
+        keep: false # Optional: Whether to keep this temp dataset after workflow completion
+        dcb: "RECFM=FB,LRECL=80" # Optional: JCL DCB for z/OS outputs
+        space: "(TRK,(10,5),RLSE)" # Optional: JCL SPACE for z/OS outputs
+    # ... other job fields
+```
+
+While `name` and `path` are always present, additional parameters like `disp`, `dcb`, `space`, and `keep` can be specified for finer control of JCL generation or the lifecycle of temporary resources. For details on how these and other resolved values are exposed when writing custom JCL templates, see [JCL Templates](/docs/jcl-templates).
+
+---
+
+# Virtual path prefixes
+
+Grace uses several distinct prefixes (schemes) in the `path` field to indicate how a data resource should be treated. Each prefix has specific implications for where Grace looks for data, how it's managed, and how it's made available to your jobs.
+
+The following sections detail each virtual path prefix:
+
+<Cards>
+  <Card href="/docs/yaml-spec/virtual-paths/src" title="src://">
+    For local project source files, typically uploaded to the mainframe.
+  </Card>
+  <Card href="/docs/yaml-spec/virtual-paths/zos" title="zos://">
+    For pre-existing, persistent datasets or PDS members on z/OS.
+  </Card>
+  <Card href="/docs/yaml-spec/virtual-paths/file" title="file://">
+    For general local files on the machine where Grace runs, primarily used with
+    shell jobs or for sourcing JCL.
+  </Card>
+  <Card href="/docs/yaml-spec/virtual-paths/zos-temp" title="zos-temp://">
+    For temporary z/OS datasets managed by Grace for intermediate data between
+    mainframe jobs.
+  </Card>
+  <Card href="/docs/yaml-spec/virtual-paths/local-temp" title="local-temp://">
+    For temporary local files managed by Grace, typically for shell job
+    intermediates.
+  </Card>
+</Cards>

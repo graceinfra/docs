@@ -35,8 +35,8 @@ datasets:
 - **Description:** Specifies the full name of the Partitioned Data Set (PDS or PDSE) where Grace will store JCL members.
   - When `grace deck` processes jobs that require JCL (e.g. `compile`, `linkedit`, `execute`) and the job does not use `jcl: zos://`
     - If Grace generates the JCL (default behavior or from a `jcl: file://` user [template](/docs/jcl-templates)), the resulting JCL is written to a member within this PDS. The member name will be the uppercase version of the `job.name`.
-  - Example:
-    - If `job.name` is `CMPCBL` and `datasets.jcl` is `MY.APP.JCL`, Grace uploads to `MY.APP.JCL(CMPCBL)`.
+  - **Example:**
+    - If [`job.name`](/docs/yaml-spec/jobs#name) is `CMPCBL` and `datasets.jcl` is `MY.APP.JCL`, Grace uploads to `MY.APP.JCL(CMPCBL)`.
   - This PDS must exist or be creatable by the Zowe user profile specified in `config.profile`. `grace deck` will attempt to create it if it doesn't exist.
 
 ---
@@ -51,8 +51,8 @@ datasets:
 - **Type:** `String`
 - **Description:** Specifies the full name of the PDS where Grace will upload local source files referenced via `src://` paths in job inputs.
   - When `grace deck` encounters an input like `path: src://myprog.cbl`, it will upload the local file `your_workflow/src/myprog.cbl` to a member in the PDS.
-  - The member name is defived from the filename by converting it to uppercase and removing common extensions (e.g. `myprog.cbl` becomes `MYPROG`)
-  - This PDS must exist or be creatable. `grace deck` will attempt to create it if it doesn't exist and `src://` inputs are present.
+  - The member name is derived from the filename by converting it to uppercase and removing common extensions (e.g. `myprog.cbl` becomes `MYPROG`)
+  - This PDS must exist or be creatable by the Zowe user profile specified in `config.profile`. `grace deck` will attempt to create it if it doesn't exist and `src://` inputs are present.
 
 ---
 

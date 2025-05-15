@@ -1,0 +1,142 @@
+---
+title: zos-temp://
+---
+
+```yaml
+path: zos-temp://<logical_identifier_for_temp_dataset>
+```
+
+The `zos-temp://` prefix is used to declare **temporary z/OS datasets** that are created, managed, and cleaned up by Grace. These are ideal for storing intermediate data passed between different z/OS job steps within your workflow (e.g., the object deck from a `compile` job fed into a `linkedit` job, or the output of one `execute` job used by another).
+
+Grace handles the actual z/OS dataset name (DSN) generation and allocation parameters for these temporary datasets, abstracting these details from your `grace.yml` job definitions.
+
+---
+
+# Resolution
+
+- **Logical identifier:** The string following `zos-temp://` (e.g., `myprog.obj`, `intermediate.data`, `step1.output`) acts as a **logical identifier** for this temporary dataset within the scope of your Grace workflow. This identifier must be unique among all `zos-temp://` and `local-temp://` paths defined in your `grace.yml` outputs.
+
+- **DSN generation:**
+  - Before the workflow (or relevant parts of it) runs, typically during `grace deck` or at the start of `grace run`/`submit`, Grace generates a unique, physical z/OS DSN for each declared `zos-temp://` output.
+  - The generated DSN follows a convention:
+    - `YOUR_HLQ.GRC.H<hash_of_virtual_path>.<DDNAME_or_IDENTIFIER>`
+    - `YOUR_HLQ` is usually derived from `datasets.jcl`
+    - The hash helps ensure uniqueness and idempotency to avoid collision with other temporary datasets in the mainframe's staging PDS.
+  - This resolved physical DSN is stored internally by Grace and used when generating JCL DD statements for jobs that produce or consume this temporary dataset.
+- **Local (for `shell` jobs):**
+  - **As an `input` to a `shell` job:** Grace downloads the content of the actual temporary z/OS dataset (using its generated DSN) to a local staging file. The environment variable (e.g., `$GRACE_INPUT_TEMPMAINDATA`) will point to this downloaded local copy.
+  - **As an `output` from a `shell` job:** Grace expects the shell script to write to a local staged file (path provided via `$GRACE_OUTPUT_TEMPMAINDATA`). After the script completes successfully, Grace uploads this local file to the uniquely generated temporary z/OS DSN.
+
+---
+
+# Typical usage examples
+
+Output from a `compile` job, consumed by a `linkedit` job:
+
+```yaml
+jobs:
+  - name: COMPILESRC
+    type: compile
+    inputs:
+      - name: SYSIN
+        path: src://mycode.cbl
+    outputs:
+      - name: SYSLIN # Standard DD for object deck
+        path: zos-temp://mycode.object # Grace manages this temp dataset
+        dcb: "RECFM=FB,LRECL=80" # Recommended for object decks
+
+  - name: LINKEDITMOD
+    type: linkedit
+    program: MYPROG
+    depends_on: [COMPILESRC]
+    inputs:
+      - name: SYSLIN
+        path: zos-temp://mycode.object # Consumes the temp dataset from COMPILESRC
+```
+
+Output from an `execute` job, used as input by a `shell` job:
+
+```yaml
+jobs:
+  - name: EXTRACTDATA
+    type: execute
+    program: DATAXTRACT
+    outputs:
+      - name: EXTRACTOUT
+        path: zos-temp://extracted_records.dat
+
+  - name: PROCESSEXTRACT
+    type: shell
+    depends_on: [EXTRACTDATA]
+    with:
+      script: ./scripts/process_records.py # Uses $GRACE_INPUT_RECORDS
+    inputs:
+      - name: RECORDS
+        path: zos-temp://extracted_records.dat # Grace downloads this for the script
+```
+
+Output from a `shell` job, uploaded to a temporary z/OS dataset:
+
+```yaml
+jobs:
+  - name: GENERATECNTL
+    type: shell
+    with:
+      inline: "echo 'PARM=XYZ' > $GRACE_OUTPUT_CNTLFILE"
+    outputs:
+      - name: CNTLFILE
+        path: zos-temp://runtime.control.cards # Grace creates temp DSN, uploads content
+
+  - name: ZOSJOBWITHCNTL
+    type: execute
+    program: BATCHAPP
+    depends_on: [GENERATECNTL]
+    inputs:
+      - name: SYSIN
+        path: zos-temp://runtime.control.cards # Uses the uploaded temp dataset
+```
+
+---
+
+# Key considerations
+
+- **Lifecycle management:** `zos-temp://` datasets are managed by Grace.
+
+  - **Allocation:** Space is allocated based on `space` and `dcb` parameters in the `outputs` definition, or Grace's defaults. The JCL for the producing job (if a z/OS type) will contain the DD statement with `DISP=(NEW,CATLG,DELETE)` (or similar, modified by `keep`).
+  - **Pre-deletion:** Before a z/OS job that produces a `zos-temp://` output runs, its handler's internal `Prepare` step typically attempts to delete any pre-existing dataset with the same generated DSN to ensure idempotency.
+  - **Cleanup:** After the workflow completes, these temporary datasets are automatically deleted based on the rules in `config.cleanup` (defaults to deletion on success) unless `keep: true` is specified in the output definition.
+
+- **Data Flow:** This is the primary mechanism for passing intermediate data between z/OS job steps within a Grace workflow without needing to define and manage intermediate datasets yourself.
+
+- `grace deck`
+
+  During `grace deck`, the engine's pre-resolution function calculates the DSNs for all `zos-temp://` outputs. This information is then used in JCL generation to ensure consuming jobs reference the correct DSNs. No actual temporary datasets are created or deleted on the mainframe by `grace deck` itself; that happens during `grace run`/`submit` runtimes.
+
+- `keep: true`
+
+  If an output using `zos-temp://` has `keep: true`, Grace changes the typical disposition to `(NEW,CATLG,CATLG)` (or similar based on context) and **will not** delete the generated z/OS dataset during cleanup. The dataset remains on the mainframe with its Grace-generated DSN. The DSN will be consistent across idempotent re-runs as long as the virtual path identifier and associated `name` (DDName) remain the same.
+
+---
+
+## Finding the generated DSN
+
+If you need to know the exact physical DSN Grace generated for a `zos-temp://` path (e.g. for debugging, or if you used `keep: true`):
+
+1.  **Inspect generated JCL:** After running `grace deck`, examine the JCL files in the `.grace/deck/` directory. DD statements referencing `zos-temp://` resources will show the resolved physical DSN.
+
+    Example from `.grace/deck/MYJOB.jcl`:
+
+    ```sh
+    # MYJOB.jcl
+    //SYSLIN DD DSN=MYHLQ.GRC.HABC123.SYSLIN,DISP=(NEW,CATLG,DELETE),...
+    ```
+
+2.  **Check Grace logs ([`workflow.log`](/docs/directory-layout/grace-internal/logs#4-workflow-log-workflowlog)):** Verbose logs often show path resolution steps.
+
+    - Example log line (from `grace run -v` or `grace deck -v`):
+
+      ```text
+      DEBUG Preresolved output path (idempotent) resolved_dsn=MYHLQ.GRC.HABC123.SYSLIN virtual_path=zos-temp://myobject.obj
+      ```
+
+3.  **Job output (`JESMSGLG` / `JESYSMSG`):** When the job runs on the mainframe, the job log will show allocation messages (e.g., `IGD101I` or `IEF237I`) that list the DSNs being allocated for DDNames corresponding to your `zos-temp://` outputs.

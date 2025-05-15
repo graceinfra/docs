@@ -84,7 +84,7 @@ jcl: zos://PROD.COMMON.JCL(STDEXEC)
 
 ## `overrides` (Optional)
 
-- **Description:** While the `overrides` block exists, the `compiler` and `linker` sub-sections within it are not directly used by the `execute` job handler itself when it generates JCL **using its default template** (as it's not compiling or linking). **However**, if you provide a custom JCL template (`jcl: file://`) that _happens_ to use variables like `{{ .CompilerPgm }}` for some reason, those could still be resolved from defaults or overrides.
+- **Description:** While the `overrides` block exists, the `compiler` and `linker` sub-sections within it are not directly used by the `execute` job handler itself when it generates JCL **using its default template** (as it's not compiling or linking). **However**, if you provide a custom JCL template (`jcl: file://`) that _happens_ to use variables like `{{ .CompilerPgm }}` for some reason, these can be resolved from defaults or overrides.
 
 > Generally, `overrides` are not a primary concern for `type: execute` jobs.
 

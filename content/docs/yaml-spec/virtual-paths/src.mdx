@@ -1,0 +1,84 @@
+---
+title: src://
+---
+
+```yaml
+path: src://<filepath_within_src_directory>
+```
+
+Refers to files located within your Grace project's local `src/` directory. This prefix is primarily used for source code (COBOL. PL/I, copybooks), JCL templates, scripts, or any other project-local file that needs to be uploaded to the mainframe as part of a PDS member or used by a local `shell` job.
+
+---
+
+# Resolution
+
+- **Local file:** Grace looks for `<filepath_within_src_directory>` inside the `src/` directory, which is expected to be at the same level as your `grace.yml` file.
+  - e.g. If `grace.yml` is in `myproject/` and `path` is `src://programs/main.cbl`, Grace looks for `myproject/src/programs/main.cbl`.
+- **Mainframe PDS member (for z/OS job inputs):**
+
+  - When used as an input to a z/OS job module (`compile`, `linkedit`, `execute`), [`grace deck`](/docs/cli-reference/deck) uploads the local file to the PDS specified in `datasets.src` ([globally](/docs/yaml-spec/datasets#src) or via job-level [override](/docs/yaml-spec/jobs#overrides)).
+  - The PDS member name is derived from the filename part of `<filepath_within_src_directory>` by converting it to uppercase and removing extensions (e.g. `main.cbl` becomes `MAIN`). Grace's PDS member name validation rules apply.
+  - e.g. `src://programs/main.cbl` might resolve to `YOUR.HLQ.SRC(MAIN)` on the mainframe.
+
+---
+
+# Typical usage examples
+
+Compile mainframe source:
+
+```yaml
+datasets:
+  src: "MYUSER.PROJECT.SOURCE"
+jobs:
+  - name: COMPILEIT
+    type: compile
+    inputs:
+      - name: SYSIN
+        path: src://app/main.cbl # Uploaded by 'deck' to MYUSER.PROJECT.SOURCE(MAIN)
+```
+
+Execute a local script from `src/`:
+
+```yaml
+jobs:
+  - name: RUNLOCALSCRIPT
+    type: shell
+    with:
+      script: src://utils/setup_env.sh # Executes ./src/utils/setup_env.sh
+```
+
+Shell job consuming a local `src/` file:
+
+```yaml
+jobs:
+  - name: PARSECONFIG
+    type: shell
+    with:
+      inline: 'python3 process_cfg.py --config "$GRACE_INPUT_APPCONFIG"'
+    inputs:
+      - name: APPCONFIG
+        path: src://config/app_settings.json
+        # $GRACE_INPUT_APPCONFIG resolves to ./src/config/app_settings.json
+```
+
+Shell job generating a file into `src/`:
+
+```yaml
+jobs:
+  - name: CODEGEN
+    type: shell
+    with:
+      script: src://tools/generate_copybook.py
+    outputs:
+      - name: NEWCOPY
+        path: src://copybooks/newlayout.cpy
+        # Script writes to $GRACE_OUTPUT_NEWCOPY -> ./src/copybooks/newlayout.cpy
+```
+
+---
+
+# Key considerations
+
+- The `grace deck` command handles the upload of `src://` files **only when they are defined as `inputs` to z/OS job types.**
+- When `src://` is used with `shell` jobs (for `with.script`, `inputs`, or `outputs`), it refers to paths within the local `src/` directory of your Grace project.
+- Ensure filenames within `src/` that are intended for mainframe PDS members are convertible to [valid member names](https://www.ibm.com/docs/en/engineering-lifecycle-management-suite/workflow-management/7.0.3?topic=definitions-zos-data-set-naming-rules) (Grace uppercases and removes file extensions such as `.cbl`, `.cpy`).

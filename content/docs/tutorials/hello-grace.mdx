@@ -155,10 +155,8 @@ jobs:
 To dive deeper, see [YAML Spec - Jobs](/docs/yaml-spec/jobs) for job types, configuring dependencies and concurrency, and advanced chaining techniques.
 
 > `zos-temp://` is a platform agnostic virtual mount path. It denotes intermediate datasets between jobs that are handled behind the scenes by Grace. The engine will provision datasets, wire dependencies, and handle cleanup automatically.
->
-> In a production workflow, you might have many `zos-temp://` and `local-temp://` paths performing file handoff between mainframe operations, cloud endpoints, local scripts, and so on.
->
-> To learn more about how this works, see [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths).
+
+> In a production workflow, you might have many `zos-temp://` and `local-temp://` paths performing file handoff between mainframe operations, cloud endpoints, local scripts, and so on. To learn more about how this works, see [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths).
 
 ---
 

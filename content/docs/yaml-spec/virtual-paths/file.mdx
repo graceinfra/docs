@@ -1,0 +1,150 @@
+---
+title: file://
+---
+
+```yaml
+path: file://somefile.txt # Path relative to grace.yml
+# or
+path: file:///home/user/somefile.txt # Absolute path
+```
+
+The `file://` prefix refers to files on the **local filesystem where Grace is being executed**. It's used for:
+
+- Providing local data files, configuration files, or other resources as input to `shell` jobs.
+- Specifying explicit local file paths where `shell` jobs should write their output.
+- Referencing local JCL files or JCL templates when using the [`job.jcl`]() field (e.g. `jcl://./mycustom.jcl`).
+
+---
+
+# Resolution
+
+- **Local file path:**
+
+  - If the path following `file://` starts with `./` or is a relative path (e.g. `data/input.csv`), Grace resolves it relative to the Grace workflow directory (containing `grace.yml`).
+    - e.g. `path: file://./config/settings.dat` in `myproject/grace.yml` resolves to `myproject/config/settings.dat`
+  - If the path is an absolute path (e.g. `/tmp/absolute_file.log` or `/home/user/file.txt`), Grace uses that absolute path directly.
+    - e.g. `path: file:///var/log/app_extract.log`
+
+- **Interaction with z/OS job modules (`compile`, `linkedit`, `execute`):**
+
+  - **As an `input`:**
+
+    When `file://<local_path>` is specified as an `input` for a z/OS job type, **Grace does not upload this to the mainframe during `grace deck`**. Consequently, Grace's default JCL templates cannot generate a DD statement that directly allows a mainframe job to access this local file.
+
+    To use the content of such a file as input to a z/OS job, you should typically use a preceding `shell` job to stage this file (e.g. by outputting to a `zos-temp://` or `zos://` path, which is then consumed by the z/OS job).
+
+    ```yaml
+    jobs:
+      - name: STAGEFILE
+        type: shell
+        with:
+          # This script could validate, transform, or just copy the file
+          inline: 'cp "$GRACE_INPUT_LOCALSOURCE" "$GRACE_OUTPUT_MAINFRAMEREADY"'
+        inputs:
+          - name: LOCALSOURCE
+            path: file://./data/raw_input.txt
+        outputs:
+          - name: MAINFRAMEREADY
+            path: zos-temp://staged_input_for_mf.txt # Grace uploads this
+
+      - name: ZOS_PROCESS
+        type: execute
+        depends_on: [STAGEFILE]
+        inputs:
+          - name: SYSIN
+            path: zos-temp://staged_input_for_mf.txt # Consumes the uploaded file
+    # ...
+    ```
+
+    Here, the `shell` job accesses the `file://` input locally, and its output (`zos-temp://`) is now usable by a downstream z/OS job.
+
+    > ⚠️ This is subject to change. Functionality for passing a `file://` path directly in a z/OS job `inputs` block is in development.
+
+  - **As an `output`:**
+
+    If `file://<local_path>` is specified as an `output` for a z/OS job type, Grace does **not** automatically download the corresponding dataset to this local `file://` path after the z/OS job completes. Similar to the above example, a subsequent `shell` job would be needed to perform such a download.
+
+    > ⚠️ This is subject to change. Functionality for passing a `file://` path directly in a z/OS job `outputs` block is in development.
+
+- **Interaction with `shell` job modules:**
+
+  - **As an `input`:** The `GRACE_INPUT_*` environment variable exposed to the shell script will contain the resolved absolute local path to the file.
+  - **As an `output`:** The `GRACE_OUTPUT_*` environment variable will contain the resolved absolute local path where the shell script is expected to write this output file.
+
+---
+
+# Typical usage examples
+
+Input to a `shell` job:
+
+```yaml
+jobs:
+  - name: PROCESSLOCALDATA
+    type: shell
+    with:
+      script: ./scripts/process_local.py
+    inputs:
+      - name: USER_DATA # Exposed to the script as $GRACE_INPUT_USER_DATA
+        path: file://./input_files/user_data.csv
+```
+
+Output from a `shell` job to a specific local file:
+
+```yaml
+jobs:
+  - name: GENERATEREPORT
+    type: shell
+    with:
+      inline: 'run_report_generator > "$GRACE_OUTPUT_FINALREPORT"' # Note: Ensure quotes if path has spaces
+    outputs:
+      - name: FINALREPORT # Exposed to the script as $GRACE_OUTPUT_FINALREPORT
+        path: file://./output/reports/monthly_sales.html # Script writes to this resolved local path
+```
+
+Using a local JCL file/template for a z/OS job:
+
+```yaml
+jobs:
+  - name: CUSTOMCOMPILE
+    type: compile
+    jcl: file://./my_jcl_templates/custom_compile_template.jcl.tmpl # Grace reads this for JCL
+    program: MYPROG
+    # ... other inputs/outputs for the compile job
+```
+
+Staging a local file for mainframe use via a `shell` job:
+
+```yaml
+jobs:
+  - name: STAGELOCALFILE
+    type: shell
+    with:
+      inline: 'cp "$GRACE_INPUT_SOURCEFILE" "$GRACE_OUTPUT_MFREADY"'
+    inputs:
+      - name: SOURCEFILE
+        path: file://./data/input_for_mf.txt
+    outputs:
+      - name: MFREADY # This output is staged locally by the shell job
+        path: zos-temp://staged.from.local.txt # Grace uploads content of $GRACE_OUTPUT_MFREADY to this temp DSN
+
+  - name: ZOSJOB_USES_STAGED
+    type: execute
+    depends_on: [STAGELOCALFILE]
+    inputs:
+      - name: JOBINPUT
+        path: zos-temp://staged.from.local.txt # Consumes the uploaded data
+    # ...
+```
+
+---
+
+# Key considerations
+
+- **Scope of access:** `file://` paths always refer to the filesystem accessible by the machine running the `grace` command.
+- **`grace deck` and uploads for z/OS job inputs:**
+  - `grace deck` **does not** automatically upload files referenced by `file://` in [`job.inputs`](/docs/yaml-spec/jobs#inputs) when those inputs are for z/OS job types. Use an intermediate `shell` job (outputting to `zos-temp://` or `zos://`) if a downstream z/OS job needs this as an input.
+  - When `file://` is used for `job.jcl`, `grace deck` reads this local file (populates it with template vars if applicable) and uploads the resulting JCL content to `datasets.jcl(JOBNAME)`
+- **`grace run/submit` and downloads for z/OS job outputs:**
+  - Grace **does not** automatically download mainframe dataset outputs to local `file://` paths declared in z/OS job `outputs`. A subsequent `shell` job is required to perform such a download.
+- **`shell` job I/O:** For `shell` jobs, `GRACE_INPUT_*` and `GRACE_OUTPUT_*` environment variables provide the direct, resolved local file paths for the script's use.
+- **Portability:** Using relative paths (e.g. `file://data/file.txt`) within your `grace.yml` generally makes your workflow more portable, assuming the relative directory structure is maintained alongside `grace.yml`. Absolute paths can limit portability.

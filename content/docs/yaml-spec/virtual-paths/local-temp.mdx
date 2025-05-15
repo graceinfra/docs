@@ -1,0 +1,117 @@
+---
+title: local-temp://
+---
+
+```yaml
+path: local-temp://<logical_identifier_for_temp_file>
+```
+
+The `local-temp://` prefix is used to declare **temporary local files** that are created, managed, and cleaned up by Grace. These are useful for:
+
+- Storing intermediate data passed between different `shell` job steps within your workflow.
+- Temporary outputs from `shell` jobs that are not intended to be permanent project files or uploaded to z/OS.
+- Staging data downloaded by a `shell` job from an external source (e.g., a web API) before further processing by another `shell` job.
+
+Grace handles the actual local file path generation within a run-specific staging area.
+
+---
+
+# Resolution
+
+- **Logical Identifier:** The string following `local-temp://` (e.g., `scratch_data.json`, `processed_chunk_1.txt`) acts as a **logical identifier** for this temporary local file within the scope of your Grace workflow. This identifier must be unique among all `zos-temp://` and `local-temp://` paths defined in your `grace.yml` outputs to avoid ambiguity or collisions.
+
+- **Actual local file path generation:**
+
+  - When a job declares an `output` with a `local-temp://` path, or an `input` that consumes such an output, Grace resolves this virtual path to a concrete local file path.
+  - This path is typically located within a run-specific local staging directory, usually:
+    `your_workflow_directory/.grace/logs/<run_specific_directory>/.local-staging/<logical_identifier_for_temp_file>`
+    - e.g. `local-temp://intermediate.dat` might resolve to something like `myproject/.grace/logs/20231028T120000_run_xxxx/.local-staging/intermediate.dat`.
+  - This resolved physical path is stored internally by Grace (`ctx.ResolvedPaths` maps the virtual path to just the `<logical_identifier_for_temp_file>`, and the full path is constructed using `ctx.LocalStageDir`).
+
+- **Interaction with `shell` jobs:**
+
+  - **As an `input` to a `shell` job:** The environment variable (e.g., `$GRACE_INPUT_MYTEMPFILE`) will contain the absolute local path to this temporary file (within the `.local-staging` directory).
+  - **As an `output` from a `shell` job:** The environment variable (e.g., `$GRACE_OUTPUT_MYTEMPFILE`) will contain the absolute local path within the `.local-staging` directory where the script **must** write its output.
+
+- **Interaction with z/OS jobs:**
+  - `local-temp://` paths are **not directly usable** by z/OS job types (`compile`, `linkedit`, `execute`) as they refer to files on the local Grace execution machine.
+  - If data from a `local-temp://` file needs to go to the mainframe, a subsequent `shell` job would need to read it (via its `GRACE_INPUT_...` variable) and then output it using a `zos://` or `zos-temp://` path to trigger an upload.
+
+---
+
+## Finding the generated local file path
+
+If you need to know the exact physical local path Grace generated for a `local-temp://` resource (e.g., for debugging a `shell` job, or if you used `keep: true`):
+
+1.  **Grace logs (`grace run -v` or `grace submit`'s `workflow.log`):**
+
+    - Verbose logs will show the `GRACE_INPUT_...` and `GRACE_OUTPUT_...` environment variables being set for `shell` jobs, which contain these resolved paths.
+    - Look for messages from the `ShellHandler` or path resolution steps.
+    - Example log line from `ShellHandler` preparing environment variables (conceptual):
+      text
+      DEBUG Setting shell env var GRACE_OUTPUT_SCRATCHDATA=/path/to/workflow/.grace/logs/YYYYMMDDTHHMMSS_run_xxxx/.local-staging/scratch_data.json
+
+2.  **Inspect the `.local-staging` Directory:**
+    - After a workflow run (especially if paused or if `keep: true` is used), you can navigate to the run-specific log directory: `.grace/logs/<run_specific_directory>/.local-staging/` to see the files created there.
+
+---
+
+# Typical usage examples
+
+Intermediate file between two `shell` jobs:
+
+```yaml
+jobs:
+  - name: DOWNLOAD_AND_UNZIP
+    type: shell
+    with:
+      inline: |
+        curl -o "$GRACE_OUTPUT_DOWNLOADED_ZIP" https://example.com/data.zip
+        unzip "$GRACE_OUTPUT_DOWNLOADED_ZIP" -d "$GRACE_OUTPUT_UNZIPPED_DIR_PARENT" 
+        # Assuming script creates a known subdirectory, e.g., data_files
+        # For simplicity, let's assume it outputs a single manifest file
+        find "$(dirname "$GRACE_OUTPUT_UNZIPPED_MANIFEST")" -type f > "$GRACE_OUTPUT_UNZIPPED_MANIFEST"
+    outputs:
+      - name: DOWNLOADED_ZIP # Not strictly needed if unzipped in same step, but example
+        path: local-temp://download.zip
+      - name: UNZIPPED_MANIFEST # Script creates this file
+        path: local-temp://manifest.txt
+
+  - name: PROCESS_FILES
+    type: shell
+    depends_on: [DOWNLOAD_AND_UNZIP]
+    with:
+      script: ./scripts/process_manifest.sh # Uses $GRACE_INPUT_MANIFEST
+    inputs:
+      - name: MANIFEST
+        path: local-temp://manifest.txt # Consumes output from previous shell job
+```
+
+Temporary output from a `shell` job:
+
+```yaml
+jobs:
+  - name: ANALYZE_LOGS
+    type: shell
+    with:
+      inline: 'grep ERROR app.log > "$GRACE_OUTPUT_ERRORS"'
+    inputs:
+      - name: APPLOG # Assuming this is defined elsewhere or available
+        path: file://./app.log
+    outputs:
+      - name: ERRORS
+        path: local-temp://error_summary.txt
+        keep: true # Keep this specific temporary file for review after the run
+```
+
+---
+
+# Key considerations
+
+- **Lifecycle management:** `local-temp://` files are managed by Grace.
+  - **Creation:** The `shell` job script writing to the `$GRACE_OUTPUT_...` path is responsible for creating the file content. Grace provides the designated path.
+  - **Location:** Files are stored in a run-specific subdirectory within `.grace/logs/` (typically `.grace/logs/<run_id>/.local-staging/`).
+  - **Cleanup:** After the workflow completes, these temporary local files are automatically deleted based on the rules in `config.cleanup` (defaults to deletion on success) unless `keep: true` is specified in the output definition.
+- **Local scope:** These files exist only on the machine where Grace is running and are primarily intended for use by `shell` jobs.
+- **No automatic mainframe interaction:** Unlike `zos-temp://`, Grace does not automatically upload `local-temp://` files to z/OS or download from z/OS to a `local-temp://` path (unless a `shell` job script explicitly performs such an action using Zowe CLI commands, for example).
+- **`keep: true`:** If an output using `local-temp://` has `keep: true`, Grace will not delete the local temporary file during its cleanup phase.

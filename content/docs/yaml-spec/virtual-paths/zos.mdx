@@ -1,0 +1,116 @@
+---
+title: zos://
+---
+
+```yaml
+path: zos://YOUR.EXISTING.DATASET
+# or
+path: zos://YOUR.EXISTING.PDS(MEMBER)
+```
+
+The `zos://` prefix is used to refer to **pre-existing, persistent datasets or PDS members** on your target z/OS system. Grace does not manage the creation or deletion of these datasets (unless a job explicitly does so).
+
+This prefix is essential for:
+
+- Reading from existing master files, parameter libraries, or shared datasets.
+- Writing to established output datasets or archival locations.
+- Referencing existing JCL members to be used (with the `job.jcl` field).
+
+---
+
+# Resolution
+
+- **Mainframe DSN:** The string following `zos://` is treated as the **literal, fully-qualified z/OS dataset name (DSN)**.
+  - Grace performs basic validation on the DSN format.
+  - No further resolution ir name generation is done by Grace for this path; it's used as-is when interacting with z/OS.
+- **Local (for `shell` jobs):**
+
+  - **As an `input` to a `shell` job:**
+
+    Grace downloads the specified z/OS dataset or PDS member to a temporary local file in Grace's staging area. The environment variable (e.g. `$GRACE_INPUT_MYZOSDATA`) will point to this downloaded local copy.
+
+  - **As an `output` from a `shell` job:**
+
+    Grace expects the shell script to write to a local staged file (path provided via `$GRACE_OUTPUT_MYZOSDATA`). After the script completes successfully, Grace uploads this local file to the specified z/OS dataset or PDS member. The target z/OS dataset shoudl exist. For PDS members, the PDS must exist.
+
+---
+
+# Typical usage examples
+
+Input to a z/OS `execute` job:
+
+```yaml
+jobs:
+  - name: PROCESSMAST
+    type: execute
+    program: MYPROG
+    inputs:
+      - name: CUSTMAST
+        path: zos://PROD.CUSTOMER.MASTER.FILE
+        disp: SHR # Explicitly stating shared access
+```
+
+Output from a z/OS `execute` job to a persistent dataset:
+
+```yaml
+jobs:
+  - name: WRITEREPORT
+    type: execute
+    program: RPTPGM
+    outputs:
+      - name: DAILYRPT
+        path: zos://REPORTS.DAILY.SALES(RPTD001)
+        disp: "(NEW,CATLG,KEEP)" # Or MOD if appending
+        space: "(CYL,(10,5),RLSE)"
+        dcb: "RECFM=FB,LRECL=132"
+```
+
+Input to a `shell` job from z/OS:
+
+```yaml
+jobs:
+  - name: ANALYZEMFDATA
+    type: shell
+    with:
+      script: ./scripts/analyze.sh # Uses $GRACE_INPUT_MFCONFIG
+    inputs:
+      - name: MFCONFIG
+        path: zos://SYS1.PROD.PARMLIB(APPCONF)
+```
+
+Output from a `shell` job (uploaded to z/OS):
+
+```yaml
+jobs:
+  - name: UPLOADRESULTS
+    type: shell
+    with:
+      inline: 'generate_data_for_mainframe > "$GRACE_OUTPUT_TARGETDS"'
+    outputs:
+      - name: TARGETDS
+        path: zos://USER.UPLOAD.DATA # Grace handles upload
+```
+
+Using an existing JCL member for a job:
+
+```yaml
+jobs:
+  - name: RUNPREBUILTJCL
+    type: execute
+    jcl: zos://PROD.STANDARD.JCL(MONTHEND) # Grace submits this JCL directly
+    program: DUMMYPROG
+    # Still required by schema, but PGM in zos:// JCL is used
+```
+
+---
+
+# Key considerations
+
+- **Existence:** When used as an input, the specified z/OS dataset/member must exist on the mainframe. Grace does not create it. When used as an output, the dataset (especially if it's a PDS for a new member) should generally exist, or the JCL/program must be capable of creating it with the correct attributes.
+
+- **Permissions:** The Zowe CLI user profile associated with Grace must have the necessary READ/WRITE/CREATE/DELETE authorities for the specified datasets on z/OS.
+
+- **`grace deck` behavior:**
+  - `grace deck` does **not** attempt to upload any local files for `zos://` paths defined in `job.inputs` or `job.outputs`. It assumes these resources are already on the mainframe.
+  - If `jcl: zos://` is used, `grace deck` skips JCL generation and upload for that job's JCL body.
+- **For `shell` job outputs to `zos://`**: Grace implicitly handles upload to the specified DSN. Ensure the target DSN is suitable for receiving an uploaded sequential file or PDS member.
