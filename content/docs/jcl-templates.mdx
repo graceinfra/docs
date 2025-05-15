@@ -1,3 +1,197 @@
 ---
 title: JCL Templates
+description: Use templates to generate JCL dynamically in Grace workflows.
 ---
+
+Grace offers powerful JCL templating capabilities, allowing you to customize the Job Control Language (JCL) generated for your z/OS job modules (`compile`, `linkedit`, `execute`). While Grace provides sensible default JCL templates for these job types, you can supply your own template files using the `job.jcl` field with a `file://` prefix.
+
+When Grace processes a job with `jcl: file://path/to/mytemplate.jcl.tmpl` (and the `--no-compile` flag is not used), it reads this file and processes it using Go's built-in `text/template` engine. This allows you to use template variables and functions to dynamically construct your JCL based on data exposed by Grace from your `grace.yml` and resolved values.
+
+> If your `file://` JCL source does not contain any Go template directives (`{{ ... }}`), Grace will treat it as a static JCL file, and the "rendering" process will output its content verbatim.
+
+---
+
+# Enabling JCL templating
+
+To use JCL templating for a specific z/OS job:
+
+1. Create a JCL template file (e.g., `my_compile_job.jcl.tmpl`) in your project, typically within a `./templates` or `./jcl` subdirectory.
+
+2. In your `grace.yml` for the desired job, set the `jcl` field to point to this file:
+
+   ```yaml
+   jobs:
+     - name: MYCOMPILE
+       type: compile
+       jcl: file://./jcl_templates/mycomp.jcl.tmpl
+       program: MYPROG # Available as {{.ProgramName}}
+       inputs:
+         - name: SYSIN
+           path: src://myprog.cbl
+       outputs:
+         - name: SYSLIN
+           path: zos-temp://myprog.obj
+       # ... other job fields ...
+   ```
+
+When `grace deck` runs (without `--no-compile`), it will read `mycomp.jcl.tmpl`, populate it with the available data context, and write the rendered JCL to `.grace/deck/MYCOMP.jcl`
+
+---
+
+# Available data context (`JCLTemplateData`)
+
+Grace exposes a structured set of data to your JCL templates. This data, referred to internally as `JCLTemplateData`, allows you to access resolved values from your `grace.yml` and Grace's internal processing.
+
+Here are the top-level fields available:
+
+---
+
+## General job data
+
+- `{{ .JobName }}`_(String)_ : The `name` of the current job from `grace.yml`.
+
+  - e.g. `MYCOMPILE`
+
+- `{{ .WorkflowId }}` _(String)_ : The unique UUID of the current workflow run.
+
+  - **Note:** This will be an empty string if `grace deck` is run outside the context of a full `grace run` or `grace submit` (as `deck` itself doesn't produce a workflow UUID). Useful for adding unique qualifiers if needed, but rely on Grace's `zos-temp://` hashing for DSN uniqueness.
+
+- `{{ .Type }}` _(String)_ : The `type` of the current job (e.g., `compile`, `linkedit`, `execute`).
+
+---
+
+## Program and library data
+
+These are resolved considering global [`config.defaults`](/docs/yaml-spec/config#defaults) and job-level `overrides`.
+
+- `{{ .ProgramName }}` _(String)_ :
+
+  - For `type: execute` : The name of the program to execute (from [`job.program`](/docs/yaml-spec/jobs/execute#program)).
+  - For `type: linkedit` : The name of the output load module (from [`job.program`](/docs/yaml-spec/jobs/linkedit#program)).
+  - For `type: compile` : The value of [`job.program`](/docs/yaml-spec/jobs/compile#program-optional-metadata) if specified (often for metadata or if a subsequent link-edit uses it by convention).
+
+- `{{ .LoadLib }}` _(String)_ : The DSN of the resolved load library (from [`datasets.loadlib`](/docs/yaml-spec/datasets#loadlib) or job-level `datasets` override).
+
+- **Compiler specific** (available for all z/OS job types, but most relevant for `type: compile`):
+
+  - `{{ .CompilerPgm }}` _(String)_ : Resolved program name for the compiler (e.g. `IGYCRCTL`).
+  - `{{ .CompilerParms }}` _(String)_ : Resolved compiler parameters.
+  - `{{ .CompilerSteplib }}` _(String)_ : Resolved `STEPLIB` DSN for the compiler (can be empty).
+
+- **Linker specific** (available for all z/OS job types, but most relevant for `type: linkedit`):
+
+  - `{{ .LinkerPgm }}` _(String)_ : Resolved program name for the linkage editor (e.g. `IEWL`).
+  - `{{ .LinkerParms }}` _(String)_ : Resolved linkage editor parameters.
+  - `{{ .LinkerSteplib }}` _(String)_ : Resolved `STEPLIB` DSN for the linkage editor (can be empty).
+
+---
+
+## Input and output DD data
+
+You have two way to include DD statements for your job's `inputs` and `outputs`:
+
+1. `{{ .DDStatements }}`
+
+   - **Type:** `String`
+   - **Description:** A pre-rendered block of JCL DD statements for all `inputs` and `outputs` defined for the job. Grace generates this block using standard JCL formatting and the resolved DSNs, dispositions, DCB, and space parameters.
+   - **Usage:** Simply place `{{ .DDStatements }}` where you want these DDs to appear. This is the easiest way if you don't need to heavily customize individual DDs or intersperse them with other custom DD statements.
+   - **Example in template:**
+
+   ```
+   //STEP1 EXEC PGM={{ .ProgramName }}
+   //STEPLIB DD DSN={{ .LoadLib }},DISP=SHR
+   {{ .DDStatements }}  // <-- Grace inserts all input/output DDs here
+   //SYSPRINT DD SYSOUT=*
+   ```
+
+2. `{{ .Inputs }}` / `{{ .Outputs }}` (granular control)
+
+   - **Type:** `[]Object`
+     - These are arrays of `ResolvedDD` objects.
+   - **Description:** These provide access to each resolved input and output individually, allowing you to loop through them and construct DD statements with custom formatting or logic.
+   - **Structure:**
+     - `{{ .Name }}` _(String)_ : The DDName (e.g. `SYSIN`, `CUSTFILE`).
+     - `{{ .DSN }}` _(String)_ : The fully resolved physical DSN (e.g. `IBMUSER.PROJ.SRC(MYPROG)`, `IBMUSER.TEMP.H123AB.SYSLIN`).
+     - `{{ .DISP }}` _(String)_ : The resolved JCL disposition (e.g. `SHR`, `(NEW,CATLG,DELETE)`). This considers [`job.disp`](/docs/yaml-spec/jobs/zos-specifics#disp) for outputs, and is overridden by [`keep`](/docs/yaml-spec/virtual-paths#keep).
+     - `{{ .Space }}` _(String, `outputs` only)_ : The resolved JCL `SPACE` parameter (e.g. `(TRK,(5,2),RLSE)`).
+     - `{{ .DCB }}` _(String, `outputs` only)_ : The resolved JCL `DCB` parameter (e.g. `RECFM=FB,LRECL=80`).
+     - `{{ .IsOutput }}`_(Boolean)_ : `true` if this is from the `outputs` array, `false` if from `inputs`. (Useful if you process them in a combined loop, though ranging separately is common practice).
+   - **Example in template:**
+
+   ```
+   //STEP1 EXEC PGM={{ .ProgramName }}
+   //STEPLIB DD DSN={{ .LoadLib }},DISP=SHR
+   {{ range .Inputs - }}
+   //{{ .Name }} DD DSN={{ .DSN }},DISP={{ .DISP }}
+   {{ end - }}
+   //MY.CUSTOM.DD DD DSN=SOME.OTHER.DSN,DISP=SHR
+   {{ range .Outputs - }}
+   //{{ .Name }} DD DSN={{ .DSN }},DISP={{ .DISP }},
+   //             SPACE={{ .Space }},DCB={{ .DCB }}
+   {{ end - }}
+   //SYSPRINT DD SYSOUT=*
+   ```
+
+   Choose either `{{ .DDStatements }}` **or** the `{{ range .Inputs/Outputs - }}` method for defining your data DDs. Using both for the same set of inputs/outputs will lead to duplicate DD statements.
+
+---
+
+## Available template functions
+
+Grace makes a few utility functions available in JCL templates:
+
+### `{{ ToUpper .StringValue }}`
+
+    Converts a string to uppercase.
+
+    - e.g. `//{{ .JobName | ToUpper }} JOB ...` results in `//MYJOB JOB ...`
+
+### `{{ Default "fallback" .PossiblyEmptyValue }}`
+
+    Provides a fallback value if `.PossiblyEmptyValue` is null or an empty string.
+
+    - e.g. `//PARM='{{ Default "NOLIST" .LinkerParms }}'`
+      - If `.LinkerParms` is `""`, this becomes `PARM='NOLIST'`.
+      - If `.LinkerParms` is `"LIST,MAP"`, this becomes `PARM='LIST,MAP'`.
+
+---
+
+# Example JCL template (`mycomp.jcl.tmpl`)
+
+```text
+//{{ .JobName | ToUpper }}C JOB (ACCOUNT),'GRACE COMPILE {{ .JobName }}',
+//             CLASS=A,MSGCLASS=X,NOTIFY=&SYSUID
+//**********************************************************************
+//* COMPILE {{ .ProgramName | Default .JobName }}
+//* USING COMPILER: {{ .CompilerPgm }}
+//* WORKFLOW ID: {{ .WorkflowId }}
+//**********************************************************************
+//COMPILE  EXEC PGM={{ .CompilerPgm }},
+//             PARM='{{ .CompilerParms }}',REGION=0M
+{{ if .CompilerSteplib - }}
+//STEPLIB  DD DSN={{ .CompilerSteplib }},DISP=SHR
+{{ end - }}
+//SYSPRINT DD SYSOUT=*
+//SYSUT1   DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+//SYSUT2   DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+//SYSUT3   DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+//SYSUT4   DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+//SYSUT5   DD UNIT=SYSDA,SPACE=(CYL,(1,1))
+
+//********* DATA DEFINITIONS FROM GRACE.YML ***********
+{{ .DDStatements }}
+//*****************************************************
+```
+
+---
+
+# Tips for writing JCL templates
+
+- **Start simple:** Begin by copying one of Grace's internal templates (from the `internal/templates/files/` directory in the [Grace source code](https://github.com/graceinfra/grace)) and modify it.
+- **Test iteratively:** Use `grace deck --only JOBNAME` to quickly regenerate and inspect the JCL in `.grace/deck/JOBNAME.jcl` after making changes to your template.
+- **Refer to Go's `text/template` docs:** For advanced templating logic (conditionals, loops, custom functions) beyond what is described here, consult the [official Go `text/template` documentation](https://pkg.go.dev/text/template#hdr-Actions).
+- **Whitespace control:** Use `{{ - ... - }}` (hyphens) to control whitespace around template actions if needed, to keep your generated JCL clean.
+
+---
+
+By leveraging JCL templating, you gain precise control and extensibility over the JCL submitted for your z/OS jobs while still benefitting from Grace's data resolution and workflow orchestration mechanisms.
