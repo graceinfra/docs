@@ -58,13 +58,11 @@ The `file://` prefix refers to files on the **local filesystem where Grace is be
 
     Here, the `shell` job accesses the `file://` input locally, and its output (`zos-temp://`) is now usable by a downstream z/OS job.
 
-    > ⚠️ This is subject to change. Functionality for passing a `file://` path directly in a z/OS job `inputs` block is in development.
-
   - **As an `output`:**
 
     If `file://<local_path>` is specified as an `output` for a z/OS job type, Grace does **not** automatically download the corresponding dataset to this local `file://` path after the z/OS job completes. Similar to the above example, a subsequent `shell` job would be needed to perform such a download.
 
-    > ⚠️ This is subject to change. Functionality for passing a `file://` path directly in a z/OS job `outputs` block is in development.
+> ⚠️ This is subject to change. Functionality for passing `file://` paths directly into z/OS job `inputs` or `outputs` block is in development.
 
 - **Interaction with `shell` job modules:**
 
