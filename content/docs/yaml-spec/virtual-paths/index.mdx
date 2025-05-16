@@ -26,6 +26,35 @@ This system allows you to define how data flows through your workflow in a decla
 
 ---
 
+# Virtual path prefixes
+
+Grace uses several distinct prefixes (schemes) in the `path` field to indicate how a data resource should be treated. Each prefix has specific implications for where Grace looks for data, how it's managed, and how it's made available to your jobs.
+
+The following sections detail each virtual path prefix:
+
+<Cards>
+  <Card href="/docs/yaml-spec/virtual-paths/src" title="src://">
+    For local project source files, typically uploaded to the mainframe.
+  </Card>
+  <Card href="/docs/yaml-spec/virtual-paths/zos" title="zos://">
+    For pre-existing, persistent datasets or PDS members on z/OS.
+  </Card>
+  <Card href="/docs/yaml-spec/virtual-paths/file" title="file://">
+    For general local files on the machine where Grace runs, primarily used with
+    shell jobs or for sourcing JCL.
+  </Card>
+  <Card href="/docs/yaml-spec/virtual-paths/zos-temp" title="zos-temp://">
+    For temporary z/OS datasets managed by Grace for intermediate data between
+    mainframe jobs.
+  </Card>
+  <Card href="/docs/yaml-spec/virtual-paths/local-temp" title="local-temp://">
+    For temporary local files managed by Grace, typically for shell job
+    intermediates.
+  </Card>
+</Cards>
+
+---
+
 # `inputs` and `outputs`
 
 As introduced in [Jobs](/docs/yaml-spec/jobs), you can specify `inputs` and `outputs` arrays for jobs to consume or produce. These arrays define the "data contract" for each job.
@@ -53,20 +82,24 @@ The **virtual path** that specifies the source (for inputs) or intended destinat
 
 ```yaml
 jobs:
-  - name: MY_SAMPLE_JOB
-    type: compile # Or any other type
-
+  - name: MY_SHELL_JOB
+    type: shell
     inputs:
-      - name: SYSIN # Logical name (becomes DDName or part of env var)
-        path: src://mycode.cbl # Virtual path to the input data
-        disp: SHR # Optional: JCL DISP for z/OS inputs
+      - name: EBCDIC_TEXT_FILE
+        path: zos://USER.DATA.EBCDIC
+        encoding: text # Download as text, convert EBCDIC to local encoding
+
+      - name: BINARY_MODULE
+        path: zos://USER.LOADLIB(MYPROG)
+        encoding: binary # Download as raw binary
+
+      - name: DEFAULT_BEHAVIOR_FILE
+        path: zos://USER.SOME.OTHER.BIN # No encoding defaults to binary
 
     outputs:
-      - name: SYSLIN # Logical name
-        path: zos-temp://mycode.obj # Virtual path for the output
-        keep: false # Optional: Whether to keep this temp dataset after workflow completion
-        dcb: "RECFM=FB,LRECL=80" # Optional: JCL DCB for z/OS outputs
-        space: "(TRK,(10,5),RLSE)" # Optional: JCL SPACE for z/OS outputs
+      - name: SOME_OUTPUT
+        path: local-temp://output.dat
+        # ... other output specific fields like keep, dcb, space ...
     # ... other job fields
 ```
 
@@ -164,31 +197,34 @@ outputs:
 
   When `keep: true` is set for a `zos-temp://` output, Grace will override the `DISP` parameter in the generated JCL to `(NEW,CATLG,CATLG)` to ensure the dataset is kept even if the step ABENDs (after successful creation and cataloging in the step). It is recommended to use **either** `disp` or `keep` fields, but not both.
 
----
+  ***
 
-# Virtual path prefixes
+## `encoding`
 
-Grace uses several distinct prefixes (schemes) in the `path` field to indicate how a data resource should be treated. Each prefix has specific implications for where Grace looks for data, how it's managed, and how it's made available to your jobs.
+```yaml
+inputs:
+  - name: SOURCE_CODE
+    path: zos://MY.COBOL.LIB(PROG01)
+    encoding: text
 
-The following sections detail each virtual path prefix:
+  - name: LOAD_MODULE
+    path: zos://MY.LOAD.LIB(PROG01)
+    # omit encoding for binary by default
 
-<Cards>
-  <Card href="/docs/yaml-spec/virtual-paths/src" title="src://">
-    For local project source files, typically uploaded to the mainframe.
-  </Card>
-  <Card href="/docs/yaml-spec/virtual-paths/zos" title="zos://">
-    For pre-existing, persistent datasets or PDS members on z/OS.
-  </Card>
-  <Card href="/docs/yaml-spec/virtual-paths/file" title="file://">
-    For general local files on the machine where Grace runs, primarily used with
-    shell jobs or for sourcing JCL.
-  </Card>
-  <Card href="/docs/yaml-spec/virtual-paths/zos-temp" title="zos-temp://">
-    For temporary z/OS datasets managed by Grace for intermediate data between
-    mainframe jobs.
-  </Card>
-  <Card href="/docs/yaml-spec/virtual-paths/local-temp" title="local-temp://">
-    For temporary local files managed by Grace, typically for shell job
-    intermediates.
-  </Card>
-</Cards>
+  - name: VSAM_BACKUP
+    path: zos://MY.VSAM.BACKUP.FILE # Defaults to binary, suitable for VSAM
+    encoding: binary # Explicitly setting it also works
+```
+
+- **Type:** `String`
+- **Optional:** Yes
+- **Default:** `"binary"` (if omitted or empty)
+- **Applies to:** `inputs` where the `path` is `zos://` or `zos-temp://` and the data is being resolved by a local process
+- **Description:** Specifies how Grace should handle character encoding when routing the resource off of the mainframe.
+- **Available values:**
+  - `binary`
+    - Performs a raw, byte-for-byte transfer. No character set conversion is attempted.
+    - **Use case:** Essential for true binary files like load modules, VSAM files with packed/binary fields, compressed data, or when you need the file to retain the exact EBCDIC representation.
+  - `text`
+    - Treats the mainframe resource as a text file (typically EBCDIC) and converts it to a standard readable text format on the local machine (usually UTF-8 or the system's default ASCII-compatible encoding).
+    - **Use case:** Ideal for COBOL source code, JCL members, report files, parameter files, or any other text-based dataset that needs to be human-readable or processed by standard text tools.

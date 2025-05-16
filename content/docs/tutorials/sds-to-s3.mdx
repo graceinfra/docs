@@ -1,0 +1,380 @@
+---
+title: SDS to AWS S3
+description: Learn how to automate migrating a z/OS sequential dataset to an AWS S3 bucket using Grace.
+---
+
+This tutorial will guide you through using Grace to orchestrate a simple but powerful hybrid workflow: moving a text-based sequential dataset from a z/OS mainframe to an AWS S3 bucket.
+
+You will learn how to:
+
+- Define a Grace job that accesses a z/OS dataset.
+- Utilize Grace's `shell` job module to interact with the AWS CLI.
+- Manage character encoding to ensure your mainframe EBCDIC text data is correctly converted to a readable format (like UTF-8) in the cloud.
+- Automate the entire extraction and load process with a single `grace run` command.
+
+This is a common scenario for archiving mainframe reports, making mainframe data available for cloud-based analytics, or staging data for further processing in cloud environments.
+
+## What you'll build
+
+You'll configure a concise `grace.yml` file that defines a single Grace `shell` job. This job will:
+
+1.  Take a z/OS sequential dataset (containing EBCDIC text) as an input.
+2.  Leverage Grace's built-in capability (via Zowe CLI) to download this dataset to the local machine where Grace is running, converting it to your local text encoding (e.g., UTF-8).
+3.  Execute an AWS CLI command to upload this locally staged text file to an S3 bucket you specify.
+
+---
+
+# Prerequisites
+
+Before you begin, please ensure you have the following set up and configured:
+
+1.  **Grace CLI:**
+    - If not, see the [Installation Guide](/docs/installation).
+2.  **Zowe CLI**
+    - Install [Zowe CLI](https://docs.zowe.org/stable/getting-started/cli-getting-started) (v3 LTS recommended).
+    - You must have a Zowe CLI `zosmf` profile that can successfully connect to your target z/OS system. This profile needs at least **READ access** to the sequential dataset you intend to migrate.
+    - Verify your profile with `zowe zosmf check status --your-profile-name`.
+    - For help, see the [Grace Configuration Guide](/docs/configuration).
+3.  **AWS CLI installed and configured:**
+    - Install the [AWS CLI](https://aws.amazon.com/cli/).
+    - Configure it with AWS credentials that have permission to **list buckets, create buckets (optional for this tutorial if you use an existing one), and upload objects (PutObject) to S3.** Typically, this involves running `aws configure` and providing your Access Key ID, Secret Access Key, and default region.
+    - This tutorial assumes usage of AWS CLI Version 2.
+4.  **Access to a z/OS system:** Where your source sequential dataset resides.
+5.  **An AWS S3 bucket:**
+    - You'll need an S3 bucket where the file will be uploaded. If you don't have one, you'll create one in the first part of this tutorial.
+6.  **A text editor:** For creating and editing your `grace.yml` file.
+
+---
+
+# Part 1: Prepare your mainframe data and S3 bucket
+
+Before we define the Grace workflow, let's set up the necessary resources: a sample sequential dataset on the mainframe and an S3 bucket in AWS.
+
+## Create a sample SDS (sequential data set) on z/OS
+
+1. **Prepare the JCL**
+
+   Copy the following JCL and save it to a local file, for example, `create_sample_seqfile.jcl`. You can place this anywhere on your local machine; Grace itself won't directly use this file in the workflow, but you'll submit it using Zowe CLI.
+
+   ```text
+   //CRSEQJOB JOB (ACCT),'CREATE SAMPLE SEQ FILE',CLASS=A,MSGCLASS=X
+   //**********************************************************************
+   //* THIS JOB CREATES A SAMPLE SEQUENTIAL DATASET WITH EBCDIC TEXT.
+   //*
+   //* !!! ACTION REQUIRED:
+   //*     REPLACE 'YOURHLQ' BELOW WITH YOUR TSO USER ID OR
+   //*     ANOTHER HIGH-LEVEL QUALIFIER YOU ARE AUTHORIZED TO USE.
+   //**********************************************************************
+   //STEP1    EXEC PGM=IEBGENER
+   //SYSPRINT DD SYSOUT=*
+   //SYSUT1   DD *,SYMBOLS=JCLONLY
+   THIS IS LINE 1 OF THE SAMPLE EBCDIC TEXT FILE.
+   GRACE ORCHESTRATES DATA MOVEMENT TO THE CLOUD.
+   LINE NUMBER 3 WITH SOME NUMBERS 12345 AND SYMBOLS: @#$
+   THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG. 0123456789
+   /*
+   //SYSUT2   DD DSN=YOURHLQ.SAMPLE.TEXTFILE,
+   //            DISP=(NEW,CATLG,DELETE),
+   //            UNIT=SYSDA,
+   //            SPACE=(TRK,(1,1)),
+   //            DCB=(RECFM=FB,LRECL=80,BLKSIZE=8000)
+   //SYSIN    DD DUMMY
+   ```
+
+   > ⚠️ Ensure you replace `YOURHLQ` in the `SYSUT2 DD DSN` statement with your actual TSO user ID or another High-Level Qualifier you are authorized to use.
+
+2. **Upload and submit the JCL using Zowe CLI**
+
+   - First upload the JCL to a PDS on the mainframe (e.g. your personal JCL library). Replace `YOUR.JCL.PDS(CRSEQJCL)` with your actual PDS and desired member name.
+
+   ```bash
+   zowe zos-files upload file-to-data-set create_sample_seqfile.jcl "YOUR.JCL.PDS(CRSEQJCL)"
+   ```
+
+   - Then, submit the JCL:
+
+   ```bash
+   zowe zos-jobs submit data-set "YOUR.JCL.PDS(CRSEQJCL)" --view-all-spool-content
+   ```
+
+   - Verify that the job completes successfully (usually `MAXCC 0000`). If it fails, check the job output for errors (e.g. authority issues, invalid HLQ).
+
+3. **Note your dataset name**
+
+   Once the job is successful, the dataset `YOURHLQ.SAMPLE.TEXTFILE` (with your actual HLQ) will exist on your z/OS system. **Make a note of this full DSN**, as you'll need it for your `grace.yml` file.
+
+## Create an S3 bucket
+
+You'll need an S3 bucket to store the data extracted from the mainframe.
+
+1. Choose a **globally unique bucket name** and your desired AWS region.
+
+2. Open your terminal and use the AWS CLI:
+
+   ```bash
+   aws s3api create-bucket --bucket grace-demo-bucket --region [your_region]
+   ```
+
+   > Make note of your **exact bucket name**, as you'll need it for `grace.yml`.
+
+## Initialize your Grace project
+
+Now, let's create a new Grace project directory.
+
+1. In your terminal, navigate to where you want to create your project and run:
+
+   ```bash
+   grace init my-sds-to-s3-flow
+   ```
+
+2. Follow the interactive prompts:
+
+   - **Workflow name:** You can accept the default (`my-sds-to-s3-flow`) or change it.
+   - **HLQ:**: Enter your typical High-Level Qualifier (e.g. your TSO ID). This will be used for [`datasets.jcl`](/docs/yaml-spec/datasets#jcl), [`datasets.src`](/docs/yaml-spec/datasets#src), etc. in `grace.yml`.
+   - **Profile:** Enter the name of your working Zowe CLI profile.
+
+3. Enter your new project directory:
+
+   ```bash
+   cd my-sds-to-s3-flow
+   ```
+
+---
+
+# Part 2: Configuring `grace.yml`
+
+Open the `grace.yml` file that `grace init` created in your `my-sqds-to-s3-flow` directory. We'll modify the [`config`](/docs/yaml-spec/config) and [`datasets`](/docs/yaml-spec/datasets) sections, and then define our single [`shell`](/docs/yaml-spec/jobs/shell) job.
+
+A basic `grace.yml` will look something like this after `grace init`:
+
+```yaml
+config:
+  profile: "your_zowe_profile" # Populated by 'grace init'
+
+datasets:
+  jcl: "YOURHLQ.WORKFLOW.JCL" # Populated by 'grace init' with your HLQ
+  src: "YOURHLQ.WORKFLOW.SRC" # Populated by 'grace init'
+  loadlib: "YOURHLQ.LOAD" # Populated by 'grace init'
+
+jobs:
+  # We will add our job definition here
+```
+
+## Verify/update the `config` block
+
+1. `profile`
+
+   The `grace init` command should have populated this with the Zowe profile you entered. Ensure it's correct.
+
+   ```yaml
+   config:
+     profile: "your_actual_zowe_profile_name" # Ensure this is correct
+   ```
+
+2. `defaults` and `concurrency`
+
+   For this specific tutorial, the `defaults` (for compiler/linker) and `concurrency` settings are not used because we are only defining a single `shell` job that doesn't compile or link code, nor does it content for mainframe job slots managed by Grace's concurrency setting.
+
+   `grace init` does not generate these fields by default, so no further work is needed here.
+
+## Verify/update the `datasets` block
+
+`grace init` should have populated the `jcl`, `src`, and `loadlib` fields with the HLQ you provided.
+
+```yaml
+datasets:
+  jcl: "YOURHLQ.WORKFLOW.JCL"
+  src: "YOURHLQ.WORKFLOW.SRC"
+  loadlib: "YOURHLQ.LOAD"
+```
+
+Ensure these DSNs look reasonable for your environment. Since we are not using `grace deck` to upload JCL or source for this tutorial (it's a shell job), these specific `datasets` are not critical to the workflow's function but are good to have correctly defined as a best practice.
+
+> `grace init` sanitizes the workflow name part of the DSN to conform to PDS member/qualifier rules (e.g. uppercasing, truncation, replacing hyphens).
+
+Save your `grace.yml` file after ensuring everything looks good. In the next step, we'll write the `jobs` block.
+
+---
+
+# Part 3: Defining the `shell` job
+
+Now, we will define the single job that orchestrates the data delivery. Add the following `jobs` block to your `grace/yml` file under the `datasets` block.
+
+```yaml
+jobs:
+  - name: SDSTOS3
+    type: shell
+    shell: bash
+    inputs:
+      - name: INFILE
+        path: "zos://YOURHLQ.SAMPLE.TEXTFILE"
+        encoding: text
+    with:
+      inline: |
+        S3_BUCKET="your-s3-bucket-name"
+        S3_KEY="migrated_data/sds_extract_$(date +%Y%m%d_%H%M%S).txt"
+
+        aws s3 cp "$GRACE_INPUT_INFILE" "s3://$S3_BUCKET/$S3_KEY" --metadata Content-Type=text/plain
+
+        if [ $? -eq 0 ]; then
+          echo "Successfully uploaded to S3: s3://$S3_BUCKET/$S3_KEY"
+        else
+          exit 1 # Crucial: exit with non-zero to mark the Grace job as FAILED
+        fi
+```
+
+> ⚠️ Change `S3_BUCKET="your-s3-bucket-name"` to point to the name of your S3 bucket.
+
+> ⚠️ Change `path: "zos://YOURHLQ.SAMPLE.TEXTFILE"` to point to the DSN of your sequential dataset on the mainframe.
+
+**Key elements in this job:**
+
+1. `name: SDSTOS3`: A clear name for this job
+2. `type: shell`: Specifies that this job will run local shell commands.
+3. `shell: bash`: Specifies that this job should use `bash` as its shell interpreter
+4. `inputs: `
+   - `name: INFILE`: This logical name will be exposed as `$GRACE_INPUT_INFILE` inside the shell script.
+   - `path: "zos://YOURHLQ.SAMPLE.TEXTFILE"`:
+     - The `zos://` prefix tells Grace to wire this dataset to the shell job from the mainframe at runtime.
+   - `encoding: text`: This is **critical**. It instructs Grace to download the EBCDIC file from the mainframe and convert it to the host's default text encoding (typically UTF-8 or another ACII-compatible encoding), making it readable by standard local tools like `aws s3 cp`.
+5. `with:`
+
+   - `inline: |`
+
+     We use an inline script for simplicity in this tutorial. The `|` operator enables multiline script definition.
+
+     - `S3_BUCKET="your-s3-bucket-name"`
+       Defines the target S3 bucket to push the dataset from the mainframe.
+     - `S3_KEY`
+       Defines the object key (filename and path within the bucket) for the uploaded file in S3. Using a timestamp makes each upload unique.
+     - `aws s3 cp "$GRACE_INPUT_INFILE" "s3://$S3_BUCKET/$S3_key" --metadata Content-type=text/plain`
+       - The core AWS CLI command.
+       - It uses the `$GRACE_INPUT_INFILE` environment variable exposed by Grace, resolving to the input dataset we defined.
+       - `--metadata Content-Type=text/plain` tells S3 to treat the uploaded object as a plain text file.
+     - `if [ $? -eq 0 ] ... else ... exit 1; fi`
+
+       Basic error checking for the AWS CLI command. **Crucially, exit 1 on failure tells Grace that this shell job step has failed**.
+
+> For details on virtual path prefixes like `zos://` and how Grace exposes environment variables for job `inputs` and `outputs`, see [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths).
+
+After adding this `jobs` block, your complete `grace.yml` should look something like this:
+
+```yaml
+config:
+  profile: "your_zowe_profile"
+
+datasets:
+  jcl: "USER01.MYSDS2S3.JCL"
+  src: "USER01.MYSDS2S3.SRC"
+  loadlib: "USER01.LOAD"
+
+jobs:
+  - name: SDSTOS3
+    type: shell
+    inputs:
+      - name: INFILE
+        path: "zos://USER01.SAMPLE.TEXTFILE"
+        encoding: text
+    with:
+      inline: |
+        S3_BUCKET="grace-demo-bucket"
+        S3_KEY="migrated_data/sds_extract_$(date +%Y%m%d_%H%M%S).txt"
+
+        aws s3 cp "$GRACE_INPUT_INFILE" "s3://$S3_BUCKET/$S3_KEY" --metadata Content-Type=text/plain
+
+        if [ $? -eq 0 ]; then
+          echo "Successfully uploaded to S3: s3://$S3_BUCKET/$S3_KEY"
+        else
+          exit 1
+        fi
+```
+
+Save your `grace.yml` file. Your workflow is now fully defined!
+
+---
+
+# Part 4: Running the Grace workflow
+
+With your `grace.yml` file configured, you're now ready to execute the workflow. For this particular workflow, since we are not generating any JCL specific to Grace's z/OS job modules (like `compile` or `linkedit`) and are not uploading local source files via `src://` prefixes for z/OS jobs, the `grace deck` command is not necessary. Grace will wire the z/OS dataset at runtime.
+
+1. **Ensure you are in your project directory** (e.g. `my-sds-to-s3-flow`) in your terminal session.
+
+2. **Execute the workflow**
+
+   ```bash
+   grace run
+   ```
+
+   You can also add the `-v` or `--verbose` glag for more detailed output, which is helpful for troubleshooting:
+
+   ```bash
+   grace run -v
+   ```
+
+As Grace runs the `SDSTOS3` job, note key steps in the output:
+
+- Grace launching the `SDSTOS3` job (🚀).
+- The final success messages (✅) from Grace.
+
+If the `aws s3 cp` command fails (e.g. due to incorrect bucket name, permissions, or AWS CLI configuration), your script's `exit 1` will cause Grace to mark the job as `FAILED`, and you'll see error messages.
+
+---
+
+# Part 4: Verifying the outcome
+
+Once `grace run` completes successfully:
+
+1. **Check AWS S3:**
+
+   Navigate to your S3 bucket in the AWS console or use the AWS CLI:
+
+   ```bash
+   aws s3 ls s3://grace-demo-bucket/migrated_data/
+   ```
+
+   You should see your uploaded file, e.g. `sds_extract_YYYYMMDD_HHMMSS.txt`.
+
+2. **Inspect the uploaded file:**
+
+   ```bash
+   aws s3 cp s3://grace-demo-bucket/migrated_data/sds_extract_YYYYMMDD_HHMMSS.txt ./downloaded_from_s3.txt
+   cat ./downloaded_from_s3.txt
+   ```
+
+   Verify that the content matches the sample data you created on the mainframe and that it's readable (i.e. correctly converted from EBCDIC to your local system's text encoding). It should look like this:
+
+   ```text
+   THIS IS LINE 1 OF THE SAMPLE EBCDIC TEXT FILE.
+   GRACE ORCHESTRATES DATA MOVEMENT TO THE CLOUD.
+   LINE NUMBER 3 WITH SOME NUMBERS 12345 AND SYMBOLS: @#$
+   THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG. 0123456789
+   ```
+
+3. **Review Grace logs** (optional):
+   - Navigate to the `.grace/logs/` directory in your project.
+   - Open the latest run-specific subdirectory (e.g. `YYYYMMDDTHHMMSS_run_<workflow_uuid>`).
+   - You'll find:
+     - `SDSTOS3_shell-xxxxxx.json`: The detailed JSON log for your shell job, containing the `stdout` and `stderr` from your inline script.
+     - `summary.json`: The overall workflow summary.
+
+---
+
+# Conclusion
+
+Congratulations! You've successfully used Grace to automate the migration of a sequential text dataset from a z/OS mainframe to an AWS S3 bucket.
+
+In this tutorial, you:
+
+- Defined a `shell` job in `grace.yml`.
+- Used `inputs` with a `zos://` path and `encoding: text` to seamlessly wire mainframe data to a local script.
+- Leveraged environment variables (`$GRACE_INPUT_*`) within a shell script to work with data managed by Grace.
+- Automated against the mainframe and AWS cloud in a centralized control plane.
+
+This simple example demonstrates a powerful pattern: **using Grace to bridge mainframe systems with modern cloud services and local tooling**.
+
+### Next steps to explore
+
+- Modify the `shell` job to perform transformations on the data locally before uploading to S3.
+- Create a workflow that first uses a z/OS job (e.g. running a COBOL program or DFSORT) to prepare or transform data on the mainframe into a `zos-temp://` dataset, and then have a `shell` job download and upload that result.
+- Explore other [`Virtual Path Prefixes`](/docs/yaml-spec/virtual-paths#virtual-path-prefixes) like `src://`, `file://`, `zos-temp://`, `local-temp://` to learn about working with data across platforms and jobs.
+- Read the [`YAML Specification`](/docs/yaml-spec) to discover more Grace features.

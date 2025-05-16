@@ -137,10 +137,16 @@ with:
 
 ```yaml
 inputs:
-  - name: CONFIG_FILE # Exposed as $GRACE_INPUT_CONFIG_FILE
+  - name: CONFIG_FILE_TEXT # Example: A JCL or PARMLIB member
     path: zos://PROD.PARMLIB(APPCONF)
-  - name: LOCAL_DATA # Exposed as $GRACE_INPUT_LOCAL_DATA
-    path: file://./input-data.csv
+    encoding: text # Ensure EBCDIC to local text conversion
+
+  - name: BINARY_DATA_FROM_MF
+    path: zos-temp://some.binary.output
+    # encoding: binary # Default, or can be explicit
+
+  - name: LOCAL_SCRIPT_PARAM
+    path: file://./parameters/script_params.json
 ```
 
 - **Description:** Defines data inputs for the shell job. For each input, Grace exposes an **environment variable** to your script/commands giving the local path to the data.
@@ -148,6 +154,7 @@ inputs:
   - e.g. An input with `name: CONFIG_FILE` will be available as `$GRACE_INPUT_CONFIG_FILE`
 - **Behavior:**
   - If the `path` is `zos://` or `zos-temp://`, Grace downloads the dataset/member to a temporary local staging file, and the environment variable points to this downloaded copy.
+  - You can control the download mode using the optional [`encoding`](/docs/yaml-spec/virtual-paths#encoding) field within the input definition.
   - If the `path` is `file://` or `src://`, the environment variable points directly to that resolved local file.
 - **Your script should use these environment variables to access input files:**
   ```bash
