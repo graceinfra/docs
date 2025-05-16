@@ -1,5 +1,5 @@
 ---
-title: SDS to AWS S3
+title: Sequential Dataset to AWS S3
 description: Learn how to automate migrating a z/OS sequential dataset to an AWS S3 bucket using Grace.
 ---
 
@@ -50,7 +50,7 @@ Before you begin, please ensure you have the following set up and configured:
 
 Before we define the Grace workflow, let's set up the necessary resources: a sample sequential dataset on the mainframe and an S3 bucket in AWS.
 
-## Create a sample SDS (sequential data set) on z/OS
+## Create a sample sequential data set on z/OS
 
 1. **Prepare the JCL**
 
@@ -124,26 +124,26 @@ Now, let's create a new Grace project directory.
 1. In your terminal, navigate to where you want to create your project and run:
 
    ```bash
-   grace init my-sds-to-s3-flow
+   grace init my-seq-to-s3-flow
    ```
 
 2. Follow the interactive prompts:
 
-   - **Workflow name:** You can accept the default (`my-sds-to-s3-flow`) or change it.
+   - **Workflow name:** You can accept the default (`my-seq-to-s3-flow`) or change it.
    - **HLQ:** Enter your typical High-Level Qualifier (e.g. your TSO ID). This will be used for [`datasets.jcl`](/docs/yaml-spec/datasets#jcl), [`datasets.src`](/docs/yaml-spec/datasets#src), etc. in `grace.yml`.
    - **Profile:** Enter the name of your working Zowe CLI profile.
 
 3. Enter your new project directory:
 
    ```bash
-   cd my-sds-to-s3-flow
+   cd my-seq-to-s3-flow
    ```
 
 ---
 
 # Part 2: Configuring `grace.yml`
 
-Open the `grace.yml` file that `grace init` created in your `my-sqds-to-s3-flow` directory. We'll modify the [`config`](/docs/yaml-spec/config) and [`datasets`](/docs/yaml-spec/datasets) sections, and then define our single [`shell`](/docs/yaml-spec/jobs/shell) job.
+Open the `grace.yml` file that `grace init` created in your `my-seq-to-s3-flow` directory. We'll modify the [`config`](/docs/yaml-spec/config) and [`datasets`](/docs/yaml-spec/datasets) sections, and then define our single [`shell`](/docs/yaml-spec/jobs/shell) job.
 
 A basic `grace.yml` will look something like this after `grace init`:
 
@@ -202,7 +202,7 @@ Now, we will define the single job that orchestrates the data delivery. Add the 
 
 ```yaml
 jobs:
-  - name: SDSTOS3
+  - name: SEQTOS3
     type: shell
     shell: bash
     inputs:
@@ -212,7 +212,7 @@ jobs:
     with:
       inline: |
         S3_BUCKET="your-s3-bucket-name"
-        S3_KEY="migrated_data/sds_extract_$(date +%Y%m%d_%H%M%S).txt"
+        S3_KEY="migrated_data/seq_extract_$(date +%Y%m%d_%H%M%S).txt"
 
         aws s3 cp "$GRACE_INPUT_INFILE" "s3://$S3_BUCKET/$S3_KEY" --metadata Content-Type=text/plain
 
@@ -229,7 +229,7 @@ jobs:
 
 **Key elements in this job:**
 
-1. `name: SDSTOS3`: A clear name for this job
+1. `name: SEQTOS3`: A clear name for this job
 2. `type: shell`: Specifies that this job will run local shell commands.
 3. `shell: bash`: Specifies that this job should use `bash` as its shell interpreter
 4. `inputs: `
@@ -264,12 +264,12 @@ config:
   profile: "your_zowe_profile"
 
 datasets:
-  jcl: "USER01.MYSDS2S3.JCL"
-  src: "USER01.MYSDS2S3.SRC"
+  jcl: "USER01.MYSEQ2S3.JCL"
+  src: "USER01.MYSEQ2S3.SRC"
   loadlib: "USER01.LOAD"
 
 jobs:
-  - name: SDSTOS3
+  - name: SEQTOS3
     type: shell
     inputs:
       - name: INFILE
@@ -278,7 +278,7 @@ jobs:
     with:
       inline: |
         S3_BUCKET="grace-demo-bucket"
-        S3_KEY="migrated_data/sds_extract_$(date +%Y%m%d_%H%M%S).txt"
+        S3_KEY="migrated_data/seq_extract_$(date +%Y%m%d_%H%M%S).txt"
 
         aws s3 cp "$GRACE_INPUT_INFILE" "s3://$S3_BUCKET/$S3_KEY" --metadata Content-Type=text/plain
 
@@ -297,7 +297,7 @@ Save your `grace.yml` file. Your workflow is now fully defined!
 
 With your `grace.yml` file configured, you're now ready to execute the workflow. For this particular workflow, since we are not generating any JCL specific to Grace's z/OS job modules (like `compile` or `linkedit`) and are not uploading local source files via `src://` prefixes for z/OS jobs, the `grace deck` command is not necessary. Grace will wire the z/OS dataset at runtime.
 
-1. **Ensure you are in your project directory** (e.g. `my-sds-to-s3-flow`) in your terminal session.
+1. **Ensure you are in your project directory** (e.g. `my-seq-to-s3-flow`) in your terminal session.
 
 2. **Execute the workflow**
 
@@ -305,15 +305,15 @@ With your `grace.yml` file configured, you're now ready to execute the workflow.
    grace run
    ```
 
-   You can also add the `-v` or `--verbose` glag for more detailed output, which is helpful for troubleshooting:
+   You can also add the `-v` or `--verbose` flag for more detailed output, which is helpful for troubleshooting:
 
    ```bash
    grace run -v
    ```
 
-As Grace runs the `SDSTOS3` job, note key steps in the output:
+As Grace runs the `SEQTOS3` job, note key steps in the output:
 
-- Grace launching the `SDSTOS3` job (🚀).
+- Grace launching the `SEQTOS3` job (🚀).
 - The final success messages (✅) from Grace.
 
 If the `aws s3 cp` command fails (e.g. due to incorrect bucket name, permissions, or AWS CLI configuration), your script's `exit 1` will cause Grace to mark the job as `FAILED`, and you'll see error messages.
@@ -332,12 +332,12 @@ Once `grace run` completes successfully:
    aws s3 ls s3://grace-demo-bucket/migrated_data/
    ```
 
-   You should see your uploaded file, e.g. `sds_extract_YYYYMMDD_HHMMSS.txt`.
+   You should see your uploaded file, e.g. `seq_extract_YYYYMMDD_HHMMSS.txt`.
 
 2. **Inspect the uploaded file:**
 
    ```bash
-   aws s3 cp s3://grace-demo-bucket/migrated_data/sds_extract_YYYYMMDD_HHMMSS.txt ./downloaded_from_s3.txt
+   aws s3 cp s3://grace-demo-bucket/migrated_data/seq_extract_YYYYMMDD_HHMMSS.txt ./downloaded_from_s3.txt
    cat ./downloaded_from_s3.txt
    ```
 
@@ -354,7 +354,7 @@ Once `grace run` completes successfully:
    - Navigate to the `.grace/logs/` directory in your project.
    - Open the latest run-specific subdirectory (e.g. `YYYYMMDDTHHMMSS_run_<workflow_uuid>`).
    - You'll find:
-     - `SDSTOS3_shell-xxxxxx.json`: The detailed JSON log for your shell job, containing the `stdout` and `stderr` from your inline script.
+     - `SEQTOS3_shell-xxxxxx.json`: The detailed JSON log for your shell job, containing the `stdout` and `stderr` from your inline script.
      - `summary.json`: The overall workflow summary.
 
 ---
