@@ -8,7 +8,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <DocsLayout
       tree={source.pageTree}
       {...baseOptions}
-      sidebar={{ defaultOpenLevel: 1 }}
+      sidebar={{ defaultOpenLevel: 2 }}
     >
       {children}
     </DocsLayout>

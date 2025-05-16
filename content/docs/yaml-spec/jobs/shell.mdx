@@ -15,7 +15,8 @@ Shell jobs are executed by the Grace instance itself, not submitted to z/OS.
 
 ```yaml
 jobs:
-  - name: LOCALSETUP # Example: A shell job doing some local setup
+  # Example: A shell job doing some local setup
+  - name: LOCALSETUP
     type: shell
     with:
       inline: |
@@ -25,14 +26,13 @@ jobs:
       - name: SETUPSTATUS # $GRACE_OUTPUT_SETUPSTATUS
         path: file://./staging_area/setup_status.txt
 
-  - name: PROCESSDATA # Example: A shell job processing a downloaded mainframe file
+  # Example: A shell job processing a downloaded mainframe file
+  - name: PROCESSDATA
     type: shell
-    depends_on: [SOME_MAINFRAME_JOB_THAT_PRODUCES_RAWDATA] # Assuming this input comes from z/OS
+    depends_on: [SOME_MAINFRAME_JOB_THAT_PRODUCES_RAWDATA] # Assuming this input comes from some z/OS job
     with:
-      script:
-        ./scripts/process_mainframe_data.sh
-        # Script uses $GRACE_INPUT_RAWDATA
-        # and writes to $GRACE_OUTPUT_PROCESSED
+      script: ./scripts/process_mainframe_data.sh
+      # Consumes $GRACE_INPUT_RAWDATA and writes to $GRACE_OUTPUT_PROCESSED and $GRACE_OUTPUT_TOUPLOAD
     inputs:
       - name: RAWDATA # $GRACE_INPUT_RAWDATA
         path: zos-temp://data.from.zos

@@ -1,5 +1,5 @@
 ---
-title: Sequential Dataset to AWS S3
+title: Sequential Dataset → AWS S3
 description: Learn how to automate migrating a z/OS sequential dataset to an AWS S3 bucket using Grace.
 ---
 
@@ -29,16 +29,16 @@ You'll configure a concise `grace.yml` file that defines a single Grace `shell` 
 Before you begin, please ensure you have the following set up and configured:
 
 1.  **Grace CLI:**
-    - If not, see the [Installation Guide](/docs/installation).
+    - If not, see [Installation](/docs/installation).
 2.  **Zowe CLI**
     - Install [Zowe CLI](https://docs.zowe.org/stable/getting-started/cli-getting-started) (v3 LTS recommended).
     - You must have a Zowe CLI `zosmf` profile that can successfully connect to your target z/OS system. This profile needs at least **READ access** to the sequential dataset you intend to migrate.
     - Verify your profile with `zowe zosmf check status --your-profile-name`.
-    - For help, see the [Grace Configuration Guide](/docs/configuration).
+    - For help, see [Configuration](/docs/configuration).
 3.  **AWS CLI installed and configured:**
     - Install the [AWS CLI](https://aws.amazon.com/cli/).
     - Configure it with AWS credentials that have permission to **list buckets, create buckets (optional for this tutorial if you use an existing one), and upload objects (PutObject) to S3.** Typically, this involves running `aws configure` and providing your Access Key ID, Secret Access Key, and default region.
-    - This tutorial assumes usage of AWS CLI Version 2.
+    - This tutorial assumes usage of **AWS CLI Version 2**.
 4.  **Access to a z/OS system:** Where your source sequential dataset resides.
 5.  **An AWS S3 bucket:**
     - You'll need an S3 bucket where the file will be uploaded. If you don't have one, you'll create one in the first part of this tutorial.
@@ -256,6 +256,8 @@ jobs:
        Basic error checking for the AWS CLI command. **Crucially, exit 1 on failure tells Grace that this shell job step has failed**.
 
 > For details on virtual path prefixes like `zos://` and how Grace exposes environment variables for job `inputs` and `outputs`, see [Virtual Paths & Job I/O](/docs/yaml-spec/virtual-paths).
+
+> To learn more about how to work with the `shell` job module, see [Jobs - Shell](/docs/yaml-spec/jobs/shell)
 
 After adding this `jobs` block, your complete `grace.yml` should look something like this:
 
