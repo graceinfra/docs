@@ -4,7 +4,7 @@ import Link from "next/link";
 export default function HomePage() {
   return (
     <main className="flex-1 min-h-screen overflow-hidden -mt-14">
-      <section className="relative w-full min-h-screen py-12 md:py-24 lg:py-32 bg-[linear-gradient(180deg,rgba(255,255,255,1)_0%,rgba(250,250,250,0.5)_100%)] dark:bg-[linear-gradient(180deg,rgba(0,0,0,1)_0%,rgba(24,24,27,0.5)_100%)]">
+      <section className="relative w-full min-h-screen mt-14 py-12 md:py-24 lg:py-32 bg-[linear-gradient(180deg,rgba(255,255,255,1)_0%,rgba(250,250,250,0.5)_100%)] dark:bg-[linear-gradient(180deg,rgba(0,0,0,1)_0%,rgba(24,24,27,0.5)_100%)]">
         <div className="absolute inset-0 bg-grid-small-black/[0.05] dark:bg-grid-small-white/[0.05] -z-10" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0.7)_50%,rgba(255,255,255,0.9)_100%)] dark:bg-[linear-gradient(180deg,rgba(0,0,0,0.9)_0%,rgba(0,0,0,0.7)_50%,rgba(0,0,0,0.9)_100%)] -z-10" />
         <div className="container relative px-4 md:px-6">
