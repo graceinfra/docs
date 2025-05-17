@@ -46,7 +46,7 @@ Before you begin, please ensure you have the following set up and configured:
 
 ---
 
-# Part 1: Prepare your mainframe data and S3 bucket
+# Prepare your mainframe data and S3 bucket
 
 Before we define the Grace workflow, let's set up the necessary resources: a sample sequential dataset on the mainframe and an S3 bucket in AWS.
 
@@ -141,7 +141,7 @@ Now, let's create a new Grace project directory.
 
 ---
 
-# Part 2: Configuring `grace.yml`
+# Configuring `grace.yml`
 
 Open the `grace.yml` file that `grace init` created in your `my-seq-to-s3-flow` directory. We'll modify the [`config`](/docs/yaml-spec/config) and [`datasets`](/docs/yaml-spec/datasets) sections, and then define our single [`shell`](/docs/yaml-spec/jobs/shell) job.
 
@@ -196,7 +196,7 @@ Save your `grace.yml` file after ensuring everything looks good. In the next ste
 
 ---
 
-# Part 3: Defining the `shell` job
+# Defining the `shell` job
 
 Now, we will define the single job that orchestrates the data delivery. Add the following `jobs` block to your `grace/yml` file under the `datasets` block.
 
@@ -295,7 +295,7 @@ Save your `grace.yml` file. Your workflow is now fully defined!
 
 ---
 
-# Part 4: Running the Grace workflow
+# Running the Grace workflow
 
 With your `grace.yml` file configured, you're now ready to execute the workflow. For this particular workflow, since we are not generating any JCL specific to Grace's z/OS job modules (like `compile` or `linkedit`) and are not uploading local source files via `src://` prefixes for z/OS jobs, the `grace deck` command is not necessary. Grace will wire the z/OS dataset at runtime.
 
@@ -322,7 +322,7 @@ If the `aws s3 cp` command fails (e.g. due to incorrect bucket name, permissions
 
 ---
 
-# Part 4: Verifying the outcome
+# Verifying the outcome
 
 Once `grace run` completes successfully:
 
