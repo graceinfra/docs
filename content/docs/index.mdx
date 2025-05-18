@@ -2,61 +2,62 @@
 title: Introduction
 ---
 
-Grace is an **open source orchestration toolchain** for cross-platform mainframe and cloud automation.
+Grace is an **open source orchestration toolchain** for running hybrid workflows across mainframe and cloud systems.
 
-Built for migration consultants and mainframe engineers alike, Grace abstracts JCL and z/OS complexity behind a **declarative YAML workflow format**, allowing you to define, run, and monitor cross-platform workflows the same way you'd ship containers or automate CI/CD.
+It brings declarative config, modular jobs, and unified logging to the world of z/OS. With Grace, you define, run, and monitor cross-platform workflows using a single YAML file. No brittle JCL chains. No polling SDSF.
 
 ---
 
 # Why Grace?
 
-Mainframes remain the backbone of the global economy, running critical workloads in banking, government, transportation, and beyond. But the developer experience for these systems hasn't kept pace with the rest of the industry.
+Mainframes power banking systems, government programs, transportation networks, and more. But automating against them is an exercise in frustration.
 
-- JCL is brittle, verbose, and difficult to manage
-- Workflow logic is hidden in monolithic scripts or job chains
-- Devs spend hours polling SDSF, wrangling DD statements, and debugging allocation errors
-- Integration with modern toolchains requires fragile glue code or manual intervention
+**Grace simplifies orchestration by codifying mainframe jobs in a shared, declarative format.** It gives teams a consistent way to define and run batch jobs, whether they're compiling COBOL, uploading to S3, or transforming data in Python.
 
-**Grace exists to fix this.**
+---
 
-We believe automating against the mainframe should be:
+# Built for hybrid teams
 
-- **Composable** - each step isolated, portable, and testable
-- **Declarative** - defined as code, version-controlled, peer-reviewed
-- **Observable** - rich logging, lifecycle status, and return code tracking
-- **Integrated** - able to chain mainframe jobs with Python scripts, shell commands, S3 uploads, and more
+In many orgs, mainframe and cloud teams operate in silos. Mainframe engineers manage legacy systems; data engineers extract and load that data downstream. Grace bridges the gap.
+
+- **Mainframe teams** use Grace to define extract and batch jobs.
+- **Cloud teams** run ETL, trigger analytics, and chain cloud-native steps.
+- **Platform teams** operate Grace as the orchestration layer in between.
+
+By working on a central control plane, teams gain joint ownership of the full pipeline - from JES to RDS, shell script to SQL.
 
 ---
 
 # What can you do with Grace?
 
-Grace is designed to feel familiar to anyone who's worked with tools like Terraform, GitHub Actions, or Airflow.
+If you've used Terraform, GitHub Actions, or Airflow, Grace will feel familiar.
 
-With a single YAML file, you can:
+With one workflow file, you can:
 
 - Compile COBOL programs
-- Link-edit and deploy load modules
-- Run batch jobs with dynamic inputs and outputs
-- Automate mainframe-native data transformations
-- Trigger cloud services from a z/OS job
-- Orchestrate pipelines across mainframe and non-mainframe infrastructure
+- Run batch jobs with inputs and outputs
+- Move datasets to cloud storage (e.g. S3)
+- Trigger ETL pipelines and Python scripts
+- Chain steps across z/OS, shell, and cloud platforms
+- Monitor, retry, and log the whole operation from one place
 
 ---
 
 # Who is Grace for?
 
-- **Admins** looking to automate atomic parts of their workload
-- **Mainframe developers** tired of fragile, repetitive job setup
-- **Platform teams** looking to standardize job orchestration
-- **Modern devs** integrating z/OS into cloud-native pipelines
-- **Enterprises** migrating workloads and seeking tooling parity
-- **Anyone** who thinks automating 50-year-old systems shouldn't require 50-year-old patterns
+Grace is for teams automating **around** the mainframe.
+
+- **Mainframe engineers** tired of brittle JCL chains
+- **Data and cloud engineers** who need reliable, repeatable handoffs
+- **Platform teams** standardizing job orchestration across systems
+- **Migration consultants** building reproducible flows for legacy workloads
+- **Enterprises** modernizing incrementally, not all at once
 
 ---
 
 # The name
 
-Grace is named in honor of [Grace Hopper](https://en.wikipedia.org/wiki/Grace_Hopper) — COBOL pioneer and one of the first to assert that computer interfaces should be _human_. We like to think she'd be excited to see her ideas remixed with today's infrastructure philosophies and applied to the world's most revered computing platform.
+Grace is named after [Grace Hopper](https://en.wikipedia.org/wiki/Grace_Hopper)—pioneer of COBOL and early advocate for human-readable programming. She believed programming should be accessible and expressive. We're bringing that same spirit to infrastructure automation, across the most enduring systems in computing history.
 
 ---
 
@@ -68,13 +69,13 @@ Grace is named in honor of [Grace Hopper](https://en.wikipedia.org/wiki/Grace_Ho
     from source.
   </Card>
   <Card href="/docs/configuration" title="Configure your environment">
-    Configure Zowe, authenticate with your z/OS target, and hook Grace up to
-    start orchestrating.
+    Set up Zowe, authenticate with z/OS, and prepare your system to run
+    workflows.
   </Card>
   <Card href="/docs/tutorials/hello-grace" title="Hello, Grace">
-    Start with the Hello, Grace tutorial and run your first workflow.
+    Run your first workflow with a sample COBOL job and dataset handoff.
   </Card>
   <Card href="/docs/cli-reference" title="CLI Reference">
-    Use the Grace CLI for preparing, validating, and running workflows.
+    See command usage for building, validating, and submitting Grace workflows.
   </Card>
 </Cards>
