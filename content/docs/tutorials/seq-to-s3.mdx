@@ -57,7 +57,7 @@ Before we define the Grace workflow, let's set up the necessary resources: a sam
    Copy the following JCL and save it to a local file, for example, `create_sample_seqfile.jcl`. You can place this anywhere on your local machine; Grace itself won't directly use this file in the workflow, but you'll submit it using Zowe CLI.
 
    ```text
-   //CRSEQJOB JOB (ACCT),'CREATE SAMPLE SEQ FILE',CLASS=A,MSGCLASS=X
+   //CRSEQJOB JOB (ACCT),'SAMPLESEQ',CLASS=A,MSGCLASS=X
    //**********************************************************************
    //* THIS JOB CREATES A SAMPLE SEQUENTIAL DATASET WITH EBCDIC TEXT.
    //*
@@ -98,6 +98,14 @@ Before we define the Grace workflow, let's set up the necessary resources: a sam
    ```
 
    - Verify that the job completes successfully (usually `MAXCC 0000`). If it fails, check the job output for errors (e.g. authority issues, invalid HLQ).
+
+   > You can view the created sequential dataset with:
+   >
+   > ```bash
+   > zowe zos-files view data-set "YOURHLQ.SAMPLE.TEXTFILE"
+   > ```
+   >
+   > Ensure the dataset identifier matches that of your JCL.
 
 3. **Note your dataset name**
 
@@ -149,12 +157,12 @@ A basic `grace.yml` will look something like this after `grace init`:
 
 ```yaml
 config:
-  profile: "your_zowe_profile" # Populated by 'grace init'
+  profile: your_zowe_profile # Populated by 'grace init'
 
 datasets:
-  jcl: "YOURHLQ.WORKFLOW.JCL" # Populated by 'grace init' with your HLQ
-  src: "YOURHLQ.WORKFLOW.SRC" # Populated by 'grace init'
-  loadlib: "YOURHLQ.LOAD" # Populated by 'grace init'
+  jcl: YOURHLQ.WORKFLOW.JCL # Populated by 'grace init' with your HLQ
+  src: YOURHLQ.WORKFLOW.SRC # Populated by 'grace init'
+  loadlib: YOURHLQ.LOAD # Populated by 'grace init'
 
 jobs:
   # We will add our job definition here
@@ -168,7 +176,7 @@ jobs:
 
    ```yaml
    config:
-     profile: "your_actual_zowe_profile_name" # Ensure this is correct
+     profile: your_zowe_profile # Ensure this is correct
    ```
 
 2. `defaults` and `concurrency`
@@ -183,9 +191,9 @@ jobs:
 
 ```yaml
 datasets:
-  jcl: "YOURHLQ.WORKFLOW.JCL"
-  src: "YOURHLQ.WORKFLOW.SRC"
-  loadlib: "YOURHLQ.LOAD"
+  jcl: YOURHLQ.WORKFLOW.JCL
+  src: YOURHLQ.WORKFLOW.SRC
+  loadlib: YOURHLQ.LOAD
 ```
 
 Ensure these DSNs look reasonable for your environment. Since we are not using `grace deck` to upload JCL or source for this tutorial (it's a shell job), these specific `datasets` are not critical to the workflow's function but are good to have correctly defined as a best practice.
@@ -324,6 +332,8 @@ If the `aws s3 cp` command fails (e.g. due to incorrect bucket name, permissions
 
 # Verifying the outcome
 
+![Loaded sequential dataset TXT in the S3 bucket](/seq_ds_in_s3.png)
+
 Once `grace run` completes successfully:
 
 1. **Check AWS S3:**
@@ -378,5 +388,5 @@ This simple example demonstrates a powerful pattern: **using Grace to bridge mai
 
 - Modify the `shell` job to perform transformations on the data locally before uploading to S3.
 - Create a workflow that first uses a z/OS job (e.g. running a COBOL program or DFSORT) to prepare or transform data on the mainframe into a `zos-temp://` dataset, and then have a `shell` job download and upload that result.
-- Explore other [`Virtual Path Prefixes`](/docs/yaml-spec/virtual-paths#virtual-path-prefixes) like `src://`, `file://`, `zos-temp://`, `local-temp://` to learn about working with data across platforms and jobs.
-- Read the [`YAML Specification`](/docs/yaml-spec) to discover more Grace features.
+- Explore other [Virtual Path Prefixes](/docs/yaml-spec/virtual-paths#virtual-path-prefixes) like `src://`, `file://`, `zos-temp://`, `local-temp://` to learn about working with data across platforms and jobs.
+- Read the [YAML Specification](/docs/yaml-spec) to discover more Grace features.
