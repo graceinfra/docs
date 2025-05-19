@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://graceinfra.org
+
+# Sitemaps
+Sitemap: https://graceinfra.org/sitemap.xml
