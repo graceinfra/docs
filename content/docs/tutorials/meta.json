@@ -1,4 +1,4 @@
 {
   "title": "Tutorials",
-  "pages": ["hello-grace", "seq-to-s3"]
+  "pages": ["hello-grace", "seq-to-s3", "vsam-to-rds"]
 }
