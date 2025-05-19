@@ -19,8 +19,10 @@ This is a common scenario for archiving mainframe reports, making mainframe data
 You'll configure a concise `grace.yml` file that defines a single Grace `shell` job. This job will:
 
 1.  Take a z/OS sequential dataset (containing EBCDIC text) as an input.
-2.  Leverage Grace's built-in capability (via Zowe CLI) to download this dataset to the local machine where Grace is running, converting it to your local text encoding (e.g., UTF-8).
-3.  Execute an AWS CLI command to upload this locally staged text file to an S3 bucket you specify.
+2.  Download this dataset to a local staging directory where Grace is running, converting it to your local text encoding (e.g., UTF-8).
+3.  Upload this locally staged text file to an S3 bucket you specify.
+
+![Loaded sequential dataset TXT in the S3 bucket](/seq_ds_in_s3.png)
 
 ---
 
@@ -124,6 +126,8 @@ You'll need an S3 bucket to store the data extracted from the mainframe.
    ```
 
    > Make note of your **exact bucket name**, as you'll need it for `grace.yml`.
+
+   > ⚠️ S3 bucket names are **globally unique**. The `grace-demo-bucket` identifier you define will probably be something like `grace-demo-bucket-[your_name]-[some_numbers]`.
 
 ## Initialize your Grace project
 
