@@ -39,7 +39,7 @@ You will configure a `grace.yml` file that defines a multi-step pipeline. This p
 
       subgraph Grace Runner
         C[Python Script\\nConverts fixed-width → CSV]
-        D[Python Script\\nLoads CSV → PostgreSQL]
+        D[Python Script\\nInserts CSV → PostgreSQL]
         B --> C
         C --> D
       end
@@ -809,7 +809,7 @@ if __name__ == "__main__":
 
 - Uses `argparse` to get the `--csv_file` path from the command line. This is where we will pass the `GRACE_INPUT_*` environment variable, pointing to the CSV file produced upstream.
 - Orchestrates the connection, table creation, and data loading.
-- Ensured the database connection is closed in a `finally` block.
+- Ensures the database connection is closed in a `finally` block.
 
 ## Create `.env` for database credentials
 
