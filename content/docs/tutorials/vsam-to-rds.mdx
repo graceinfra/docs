@@ -343,9 +343,9 @@ Inside your Grace project's `src/` directory (`vsam-postgres-etl/src/`), create 
 
 ---
 
-# Declare the mainframe extraction job in `grace.yml`
+# Declare the COBOL extraction job in `grace.yml`
 
-Now that we have our sample VSAM KSDS on the mainframe and our COBOl extraction program (`vsamextr.cbl`) in our local `src/` directory, we need to tell Grace how to compile, link, and execute this program.
+Now that we have our sample VSAM KSDS on the mainframe and our COBOL extraction program (`vsamextr.cbl`) in our local `src/` directory, we need to tell Grace how to compile, link, and execute this program.
 
 Open your `vsam-postgres-etl/grace.yml` file. We'll first set up the `config` and `datasets` sections, and then define the jobs.
 
