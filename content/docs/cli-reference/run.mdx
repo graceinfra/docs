@@ -3,7 +3,7 @@ title: grace run
 description: Execute and monitor a Grace workflow on z/OS synchronously.
 ---
 
-The `grace run` command orchestrates the execution of a defined workflow from your `grace.yml` file. It submits jobs to the z/OS system in the specified order, respects dependencies, monitors their progress, and provides real-time feedback in your terminal.
+The `grace run` command orchestrates the execution of a defined workflow from your `grace.yml` file. It executes jobs in the specified order, respects dependencies, monitors their progress, and provides real-time feedback in your terminal.
 
 `grace run` operates **synchronously**, meaning the command will not exit until all jobs in the workflow have completed, failed, or been skipped. It assumes that all necessary JCL and source files have already been prepared and uploaded to the mainframe, typically by using the [`grace deck`](/docs/cli-reference/deck) command.
 
@@ -50,7 +50,7 @@ When you execute `grace run`:
 1.  **Loads workflow:** Parses and validates the `grace.yml` configuration file, including checking job dependencies and syntax.
 2.  **Creates log directory:** A new unique, timestamped log directory is created under `.grace/logs/` (e.g., `.grace/logs/YYYYMMDDTHHMMSS_run_workflow-uuid/`). This directory will store detailed logs for each executed job and a final workflow summary.
 3.  **Builds execution graph:** Constructs an internal dependency graph of all jobs defined in the workflow.
-4.  **resolves paths:** Determines actual DSNs for `zos-temp://` inputs/outputs to ensure data flows correctly between jobs.
+4.  **Resolves paths:** Determines actual DSNs for `zos-temp://` inputs/outputs to ensure data flows correctly between jobs.
 5.  **Orchestrates job execution:**
     - Iterates through the job graph, respecting dependencies.
     - For each job eligible to run (i.e., its dependencies have successfully completed):
